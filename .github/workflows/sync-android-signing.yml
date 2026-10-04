@@ -43,8 +43,6 @@ jobs:
 
           owner="khahdihdz"
           central="khahdihdz/apksign"
-          workflow_url="https://raw.githubusercontent.com/khahdihdz/apksign/main/.github/workflows/android-shared-signing.yml"
-
           gh repo list "$owner" --limit 1000 --json nameWithOwner,isArchived \
             --jq '.[] | select(.isArchived == false) | .nameWithOwner' > repos.txt
 
@@ -55,7 +53,7 @@ jobs:
             tree="$(gh api "repos/$repo/git/trees/$default_branch?recursive=1" 2>/dev/null || true)"
             [ -n "$tree" ] || continue
 
-            gradlew="$(printf '%s' "$tree" | jq -r '.tree[]? | select(.type=="blob" and (.path|endswith("/gradlew") or .path=="gradlew")) | .path' | head -n1)"
+            gradlew="$(printf '%s' "$tree" | jq -r '.tree[]? | select(.type=="blob" and ((.path|endswith("/gradlew")) or .path=="gradlew")) | .path' | head -n1)"
             [ -n "$gradlew" ] || continue
 
             project_dir="$(dirname "$gradlew")"
@@ -99,6 +97,10 @@ PY
             path=".github/workflows/android-shared-signing.yml"
             existing="$(gh api "repos/$repo/contents/$path?ref=$default_branch" 2>/dev/null || true)"
             sha="$(printf '%s' "$existing" | jq -r '.sha // empty')"
+            if [ -n "$sha" ]; then
+              echo "Signing workflow already exists: $repo"
+              continue
+            fi
 
             args=(-X PUT "repos/$repo/contents/$path" -f "message=ci: enable centralized Android signing" -f "content=$encoded" -f "branch=$default_branch")
             [ -n "$sha" ] && args+=(-f "sha=$sha")
