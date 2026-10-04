@@ -39,11 +39,12 @@ chmod +x apksign
 ```text
 1. Cài JDK / công cụ
 2. Tạo signing keystore
-3. Xem certificate + SHA-256
-4. Xuất keystore Base64
-5. Kiểm tra APK đã ký
-6. GitHub Secrets
-7. Sao lưu keystore
+3. Ký APK bất kỳ
+4. Xem certificate + SHA-256
+5. Xuất keystore Base64
+6. Kiểm tra APK đã ký
+7. GitHub Secrets
+8. Sao lưu keystore
 0. Thoát
 ```
 
@@ -154,6 +155,38 @@ Bộ signing Secret này có thể dùng cho các Android project của **khahdi
 
 Mỗi ứng dụng vẫn phải giữ **applicationId riêng**; việc dùng chung signing key là lựa chọn của hệ thống phát hành.
 
+
+## 🤖 Tự động áp dụng cho Android repository
+
+apksign hiện có cơ chế trung tâm tại `.github/workflows/sync-android-signing.yml`. Workflow định kỳ quét các repository thuộc tài khoản `khahdihdz`, nhận diện dự án có Gradle Wrapper Android, đồng bộ 4 signing secrets và thêm workflow signing dùng chung nếu repository chưa có workflow đó.
+
+Cơ chế này dùng reusable workflow theo chuẩn GitHub Actions, giúp tránh phải sao chép logic signing giữa các repository. GitHub hỗ trợ reusable workflows và truyền secrets cho workflow được gọi. citeturn0search0turn0search1
+
+### Thiết lập một lần
+
+Trong repository `khahdihdz/apksign`, tạo 5 Actions Secrets:
+
+- `APKSIGN_SYNC_TOKEN`: GitHub token có quyền đọc danh sách repository và ghi contents + Actions secrets vào các repository cần đồng bộ.
+- `ANDROID_SIGNING_KEYSTORE_BASE64`
+- `ANDROID_SIGNING_STORE_PASSWORD`
+- `ANDROID_SIGNING_KEY_ALIAS`
+- `ANDROID_SIGNING_KEY_PASSWORD`
+
+Sau đó chạy **Actions → Sync Android signing to all repositories → Run workflow** một lần. Các lần sau workflow tự chạy theo lịch và có thể chạy thủ công. GitHub CLI hỗ trợ đặt repository secret từ workflow/token bằng `gh secret set`. citeturn1search0
+
+> Với tài khoản cá nhân, GitHub không có organization-level secret dùng chung cho toàn bộ repository. Cơ chế của apksign vì vậy đồng bộ secret vào từng Android repository; repository Android mới sẽ được nhận diện ở lần đồng bộ kế tiếp.
+
+### Lưu ý quan trọng
+
+Cơ chế tự động **không ghi đè workflow release Android hiện có**. NRSuite-Android và espflash đang có cấu hình release signing riêng nên được giữ nguyên; hệ thống chỉ bổ sung/cấu hình repository Android mới chưa có workflow signing trung tâm.
+
+### Phạm vi
+
+- Android repository hiện tại: tự đồng bộ khi chạy workflow.
+- Android repository tương lai: tự phát hiện ở lần chạy lịch tiếp theo.
+- APK release: ký bằng cùng certificate đã cấu hình.
+- Không đưa private keystore vào Git.
+- Không fallback release sang debug signing.
 
 ## 🌐 Landing Page
 
