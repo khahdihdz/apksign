@@ -1,0 +1,10 @@
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.base64
+keystore.properties
+release.jks
+.env
