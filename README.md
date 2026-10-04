@@ -154,6 +154,18 @@ Bộ signing Secret này có thể dùng cho các Android project của **khahdi
 
 Mỗi ứng dụng vẫn phải giữ **applicationId riêng**; việc dùng chung signing key là lựa chọn của hệ thống phát hành.
 
+
+## 🌐 Landing Page
+
+Trang giới thiệu tính năng và tải xuống:
+
+**https://khahdihdz.github.io/apksign/**
+
+- ⬇️ Tải mã nguồn dạng ZIP
+- 🔗 Truy cập repository GitHub
+- 📦 Truy cập Releases
+- 📱 Giới thiệu tính năng và hướng dẫn cài đặt nhanh
+
 ## 📄 Giấy phép
 
 Phát hành theo giấy phép **MIT**.
@@ -161,5 +173,7 @@ Phát hành theo giấy phép **MIT**.
 ## 👤 Tác giả
 
 **khahdihdz**
+
+Website: https://khahdihdz.github.io/
 
 [Repository apksign](https://github.com/khahdihdz/apksign)
