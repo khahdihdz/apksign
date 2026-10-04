@@ -1,0 +1,107 @@
+name: Sync Android signing to all repositories
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 2 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required secrets
+        env:
+          TOKEN: ${{ secrets.APKSIGN_SYNC_TOKEN }}
+          KS: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+          SP: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+          KP: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
+        run: |
+          set -e
+          test -n "$TOKEN" || { echo "Missing APKSIGN_SYNC_TOKEN"; exit 1; }
+          test -n "$KS" || { echo "Missing ANDROID_SIGNING_KEYSTORE_BASE64"; exit 1; }
+          test -n "$SP" || { echo "Missing ANDROID_SIGNING_STORE_PASSWORD"; exit 1; }
+          test -n "$ALIAS" || { echo "Missing ANDROID_SIGNING_KEY_ALIAS"; exit 1; }
+          test -n "$KP" || { echo "Missing ANDROID_SIGNING_KEY_PASSWORD"; exit 1; }
+
+      - name: Install GitHub CLI
+        run: gh --version
+
+      - name: Discover and synchronize Android repositories
+        env:
+          GH_TOKEN: ${{ secrets.APKSIGN_SYNC_TOKEN }}
+          SIGNING_KS: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_SP: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+          SIGNING_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+          SIGNING_KP: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          owner="khahdihdz"
+          central="khahdihdz/apksign"
+          workflow_url="https://raw.githubusercontent.com/khahdihdz/apksign/main/.github/workflows/android-shared-signing.yml"
+
+          gh repo list "$owner" --limit 1000 --json nameWithOwner,isArchived \
+            --jq '.[] | select(.isArchived == false) | .nameWithOwner' > repos.txt
+
+          while IFS= read -r repo; do
+            [ "$repo" = "$central" ] && continue
+
+            default_branch="$(gh api "repos/$repo" --jq '.default_branch')"
+            tree="$(gh api "repos/$repo/git/trees/$default_branch?recursive=1" 2>/dev/null || true)"
+            [ -n "$tree" ] || continue
+
+            gradlew="$(printf '%s' "$tree" | jq -r '.tree[]? | select(.type=="blob" and (.path|endswith("/gradlew") or .path=="gradlew")) | .path' | head -n1)"
+            [ -n "$gradlew" ] || continue
+
+            project_dir="$(dirname "$gradlew")"
+            [ "$project_dir" = "." ] && project_dir="."
+
+            echo "Android Gradle project: $repo (project-dir=$project_dir)"
+
+            gh secret set ANDROID_SIGNING_KEYSTORE_BASE64 --repo "$repo" --body "$SIGNING_KS"
+            gh secret set ANDROID_SIGNING_STORE_PASSWORD --repo "$repo" --body "$SIGNING_SP"
+            gh secret set ANDROID_SIGNING_KEY_ALIAS --repo "$repo" --body "$SIGNING_ALIAS"
+            gh secret set ANDROID_SIGNING_KEY_PASSWORD --repo "$repo" --body "$SIGNING_KP"
+
+            body="$(python3 - "$project_dir" <<'PY'
+import json, sys
+project_dir = sys.argv[1]
+data = {
+  "name": "Android shared signing",
+  "on": {
+    "workflow_dispatch": {},
+    "push": {"branches": ["main"]}
+  },
+  "permissions": {"contents": "read"},
+  "jobs": {
+    "sign": {
+      "uses": "khahdihdz/apksign/.github/workflows/android-shared-signing.yml@main",
+      "with": {"project-dir": project_dir},
+      "secrets": {
+        "ANDROID_SIGNING_KEYSTORE_BASE64": "${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}",
+        "ANDROID_SIGNING_STORE_PASSWORD": "${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}",
+        "ANDROID_SIGNING_KEY_ALIAS": "${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}",
+        "ANDROID_SIGNING_KEY_PASSWORD": "${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}"
+      }
+    }
+  }
+}
+print(json.dumps(data, indent=2))
+PY
+)"
+
+            encoded="$(printf '%s' "$body" | base64 -w0)"
+            path=".github/workflows/android-shared-signing.yml"
+            existing="$(gh api "repos/$repo/contents/$path?ref=$default_branch" 2>/dev/null || true)"
+            sha="$(printf '%s' "$existing" | jq -r '.sha // empty')"
+
+            args=(-X PUT "repos/$repo/contents/$path" -f "message=ci: enable centralized Android signing" -f "content=$encoded" -f "branch=$default_branch")
+            [ -n "$sha" ] && args+=(-f "sha=$sha")
+
+            gh api "${args[@]}"
+          done
