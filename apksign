@@ -1,0 +1,137 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+set -u
+
+APP_NAME="apksign"
+KEYSTORE_DIR="$HOME/.apksign"
+KEYSTORE="$KEYSTORE_DIR/khahdihdz-release.jks"
+BASE64_FILE="$KEYSTORE_DIR/keystore.base64"
+ALIAS="khahdihdz-release"
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+CYAN='\033[0;36m'; NC='\033[0m'
+
+mkdir -p "$KEYSTORE_DIR"
+
+pause() { echo; read -r -p "Nhấn Enter để tiếp tục..."; }
+header() { clear; echo -e "$CYAN"; echo "=============================================="; echo "              apksign"; echo "   Android Signing Manager for Termux"; echo "=============================================="; echo -e "$NC"; }
+
+check_java() {
+  command -v keytool >/dev/null 2>&1 && return 0
+  echo -e "$YELLOW Chưa có keytool/JDK.$NC"
+  read -r -p "Cài OpenJDK 17 ngay? [Y/n]: " a
+  [[ "${a:-Y}" =~ ^[Yy]$ ]] || return 1
+  pkg update -y && pkg install openjdk-17 coreutils -y
+  command -v keytool >/dev/null 2>&1
+}
+
+create_keystore() {
+  header
+  check_java || { pause; return; }
+  if [[ -f "$KEYSTORE" ]]; then
+    echo -e "$YELLOW Keystore đã tồn tại, không ghi đè:$NC"
+    echo "$KEYSTORE"; pause; return
+  fi
+  echo "Keystore: $KEYSTORE"
+  echo "Alias:    $ALIAS"; echo
+  read -r -s -p "Keystore password: " STORE_PASSWORD; echo
+  read -r -s -p "Nhập lại: " STORE_PASSWORD2; echo
+  [[ "$STORE_PASSWORD" == "$STORE_PASSWORD2" ]] || { echo -e "$RED Mật khẩu không khớp.$NC"; unset STORE_PASSWORD STORE_PASSWORD2; pause; return; }
+  [[ ${#STORE_PASSWORD} -ge 8 ]] || { echo -e "$RED Mật khẩu tối thiểu 8 ký tự.$NC"; unset STORE_PASSWORD STORE_PASSWORD2; pause; return; }
+  read -r -s -p "Key password: " KEY_PASSWORD; echo
+  read -r -s -p "Nhập lại: " KEY_PASSWORD2; echo
+  [[ "$KEY_PASSWORD" == "$KEY_PASSWORD2" ]] || { echo -e "$RED Mật khẩu key không khớp.$NC"; unset STORE_PASSWORD STORE_PASSWORD2 KEY_PASSWORD KEY_PASSWORD2; pause; return; }
+  read -r -p "Tên chủ sở hữu [khahdihdz]: " CN; CN="${CN:-khahdihdz}"
+  keytool -genkeypair -v -keystore "$KEYSTORE" -alias "$ALIAS" -keyalg RSA -keysize 4096 -validity 10000 -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" -dname "CN=$CN, OU=Android, O=khahdihdz, L=Vietnam, ST=Vietnam, C=VN"
+  local r=$?
+  unset STORE_PASSWORD STORE_PASSWORD2 KEY_PASSWORD KEY_PASSWORD2
+  [[ $r -eq 0 ]] && { chmod 600 "$KEYSTORE"; echo -e "$GREEN Tạo signing key thành công.$NC"; } || echo -e "$RED Tạo keystore thất bại.$NC"
+  pause
+}
+
+show_info() {
+  header; check_java || { pause; return; }
+  [[ -f "$KEYSTORE" ]] || { echo -e "$RED Chưa có keystore.$NC"; pause; return; }
+  keytool -list -v -keystore "$KEYSTORE" -alias "$ALIAS"
+  pause
+}
+
+export_base64() {
+  header
+  [[ -f "$KEYSTORE" ]] || { echo -e "$RED Chưa có keystore.$NC"; pause; return; }
+  base64 "$KEYSTORE" | tr -d '\n' > "$BASE64_FILE"
+  chmod 600 "$BASE64_FILE"
+  echo -e "$GREEN Đã tạo:$NC $BASE64_FILE"
+  echo; echo "GitHub Secret: ANDROID_SIGNING_KEYSTORE_BASE64"
+  echo "Giá trị = toàn bộ nội dung file keystore.base64"
+  echo -e "$YELLOW Không commit .jks hoặc Base64 private key vào repo.$NC"
+  pause
+}
+
+verify_apk() {
+  header
+  command -v apksigner >/dev/null 2>&1 || { echo -e "$YELLOW Không tìm thấy apksigner. Cài Android SDK Build Tools và thêm vào PATH.$NC"; pause; return; }
+  read -r -p "Đường dẫn APK: " APK
+  [[ -f "$APK" ]] || { echo -e "$RED Không tìm thấy APK.$NC"; pause; return; }
+  apksigner verify --verbose --print-certs "$APK"
+  pause
+}
+
+backup_keystore() {
+  header
+  [[ -f "$KEYSTORE" ]] || { echo -e "$RED Chưa có keystore.$NC"; pause; return; }
+  local d="$HOME/android-signing-backups"; mkdir -p "$d"
+  local f="$d/khahdihdz-release-$(date '+%Y%m%d-%H%M%S').jks"
+  cp "$KEYSTORE" "$f"; chmod 600 "$f"
+  echo -e "$GREEN Đã sao lưu:$NC $f"; pause
+}
+
+github_secrets() {
+  header
+  cat <<EOF
+4 GitHub Secrets dùng chung:
+
+1. ANDROID_SIGNING_KEYSTORE_BASE64
+   = nội dung ~/.apksign/keystore.base64
+
+2. ANDROID_SIGNING_STORE_PASSWORD
+   = mật khẩu keystore
+
+3. ANDROID_SIGNING_KEY_ALIAS
+   = $ALIAS
+
+4. ANDROID_SIGNING_KEY_PASSWORD
+   = mật khẩu key
+
+Dùng cùng 4 secret cho mọi Android repo.
+KHÔNG commit private keystore vào repository.
+EOF
+  pause
+}
+
+install_tools() { header; pkg update -y; pkg install openjdk-17 coreutils -y; java -version; pause; }
+
+while true; do
+  header
+  echo "1. Cài JDK / công cụ"
+  echo "2. Tạo signing keystore"
+  echo "3. Xem certificate + SHA-256"
+  echo "4. Xuất keystore Base64"
+  echo "5. Kiểm tra APK đã ký"
+  echo "6. GitHub Secrets"
+  echo "7. Sao lưu keystore"
+  echo "0. Thoát"
+  echo
+  read -r -p "Chọn [0-7]: " choice
+  case "$choice" in
+    1) install_tools ;;
+    2) create_keystore ;;
+    3) show_info ;;
+    4) export_base64 ;;
+    5) verify_apk ;;
+    6) github_secrets ;;
+    7) backup_keystore ;;
+    0) clear; exit 0 ;;
+    *) echo -e "$RED Lựa chọn không hợp lệ.$NC"; sleep 1 ;;
+  esac
+done
