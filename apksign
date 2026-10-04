@@ -122,6 +122,11 @@ while true; do
   echo "7. Sao lưu keystore"
   echo "0. Thoát"
   echo
+  echo "----------------------------------------------"
+  echo "© 2026 khahdihdz"
+  echo "github.com/khahdihdz/apksign"
+  echo "----------------------------------------------"
+  echo
   read -r -p "Chọn [0-7]: " choice
   case "$choice" in
     1) install_tools ;;
