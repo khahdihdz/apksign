@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>apksign — Android Signing Manager</title>
+<meta name="description" content="apksign — công cụ quản lý Android release keystore trên Termux của khahdihdz.">
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#080b12;color:#eef2ff;line-height:1.6}a{color:#8ab4ff}.wrap{max-width:1050px;margin:auto;padding:28px 20px}.hero{padding:80px 0 55px}.badge{display:inline-block;padding:6px 12px;border:1px solid #293247;border-radius:999px;color:#aebbd4;font-size:14px}.hero h1{font-size:clamp(44px,8vw,76px);line-height:1;margin:18px 0}.hero p{max-width:700px;font-size:19px;color:#aeb8cc}.buttons{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}.btn{display:inline-block;padding:12px 18px;border-radius:12px;text-decoration:none;font-weight:700;background:#fff;color:#090c13}.btn.alt{background:#171d2b;color:#eef2ff;border:1px solid #30394d}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:25px 0 70px}.card{padding:22px;border:1px solid #20283a;background:#0e131e;border-radius:18px}.card h3{margin-top:0}.muted{color:#98a5bb}pre{overflow:auto;background:#06080d;padding:18px;border-radius:14px;border:1px solid #20283a}section{margin:65px 0}footer{border-top:1px solid #20283a;padding:30px 0;color:#8996aa}code{color:#cbd7ff}</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+<span class="badge">TERMUX • ANDROID • OPEN SOURCE</span>
+<h1>apksign</h1>
+<p>Công cụ quản lý chữ ký Android release trên Termux. Tạo keystore RSA-4096, xem certificate, xuất Base64 cho GitHub Actions, kiểm tra APK và sao lưu signing key.</p>
+<div class="buttons">
+<a class="btn" href="https://github.com/khahdihdz/apksign/archive/refs/heads/main.zip">⬇ Tải ZIP</a>
+<a class="btn alt" href="https://github.com/khahdihdz/apksign">GitHub Repository</a>
+<a class="btn alt" href="https://github.com/khahdihdz/apksign/releases">Releases</a>
+</div>
+</header>
+<section>
+<h2>Tính năng</h2>
+<div class="grid">
+<div class="card"><h3>🔐 RSA-4096</h3><p class="muted">Tạo Android release keystore dùng cho quá trình phát hành ứng dụng.</p></div>
+<div class="card"><h3>🧾 SHA-256</h3><p class="muted">Xem certificate và fingerprint để kiểm tra signing identity.</p></div>
+<div class="card"><h3>📦 GitHub Actions</h3><p class="muted">Xuất keystore Base64 và dùng bộ Secret chuẩn hóa.</p></div>
+<div class="card"><h3>✅ Verify APK</h3><p class="muted">Kiểm tra chữ ký APK bằng Android <code>apksigner</code>.</p></div>
+<div class="card"><h3>💾 Backup</h3><p class="muted">Tạo bản sao lưu keystore để tránh mất signing key.</p></div>
+<div class="card"><h3>🛡️ An toàn</h3><p class="muted">Không ghi đè keystore đang tồn tại và không đưa private key vào repo.</p></div>
+</div>
+</section>
+<section>
+<h2>Cài đặt nhanh</h2>
+<pre><code>pkg update -y
+pkg install git -y
+git clone https://github.com/khahdihdz/apksign.git
+cd apksign
+chmod +x apksign
+./apksign</code></pre>
+</section>
+<section>
+<h2>GitHub Secrets</h2>
+<p class="muted">Bộ Secret chuẩn dùng cho Android repositories:</p>
+<pre><code>ANDROID_SIGNING_KEYSTORE_BASE64
+ANDROID_SIGNING_STORE_PASSWORD
+ANDROID_SIGNING_KEY_ALIAS
+ANDROID_SIGNING_KEY_PASSWORD</code></pre>
+</section>
+<section>
+<h2>Giữ an toàn signing key</h2>
+<p class="muted">Không commit file <code>.jks</code>, Base64 keystore hoặc mật khẩu vào repository public. Để cập nhật ứng dụng Android, hãy giữ nguyên application ID và release signing key của ứng dụng đã phát hành.</p>
+</section>
+<footer>
+<strong>apksign</strong> · MIT License · Được phát triển bởi <a href="https://khahdihdz.github.io/">khahdihdz.github.io</a>
+</footer>
+</div>
+</body>
+</html>
