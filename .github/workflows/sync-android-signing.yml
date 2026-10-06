@@ -24,7 +24,7 @@ jobs:
           test -n "$TOKEN"
           test -n "$KEYSTORE"
           test -n "$STORE_PASSWORD"
-          test -n "$KEY_ALIAS"
+          test -n "$KEY_ALIAS" || true
           test -n "$KEY_PASSWORD"
 
       - name: Sync signing secrets
@@ -37,6 +37,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          KEY_ALIAS="${KEY_ALIAS:-khahdihdz-release}"
 
           owner="khahdihdz"
           central="khahdihdz/apksign"
