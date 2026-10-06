@@ -27,6 +27,33 @@ jobs:
           test -n "$KEY_ALIAS" || true
           test -n "$KEY_PASSWORD"
 
+      - name: Validate source keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          KEY_ALIAS="${KEY_ALIAS:-khahdihdz-release}"
+          test -n "$KEYSTORE_B64"
+          test -n "$STORE_PASSWORD"
+
+          KS="$RUNNER_TEMP/source-signing.jks"
+          CLEAN_B64="$RUNNER_TEMP/source-signing.b64"
+
+          printf '%s' "$KEYSTORE_B64" | tr -d '[:space:]' > "$CLEAN_B64"
+          base64 --decode "$CLEAN_B64" > "$KS"
+          chmod 600 "$KS"
+
+          keytool -list \
+            -keystore "$KS" \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" >/dev/null
+
+          echo "Source signing keystore validated."
+
       - name: Sync signing secrets
         env:
           GH_TOKEN: ${{ secrets.APKSIGN_SYNC_TOKEN }}
