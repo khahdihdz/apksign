@@ -15,34 +15,32 @@ jobs:
       - name: Check required secrets
         env:
           TOKEN: ${{ secrets.APKSIGN_SYNC_TOKEN }}
-          KS: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
-          SP: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
-          ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
-          KP: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
+          KEYSTORE: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
         run: |
           set -e
-          test -n "$TOKEN" || { echo "Missing APKSIGN_SYNC_TOKEN"; exit 1; }
-          test -n "$KS" || { echo "Missing ANDROID_SIGNING_KEYSTORE_BASE64"; exit 1; }
-          test -n "$SP" || { echo "Missing ANDROID_SIGNING_STORE_PASSWORD"; exit 1; }
-          test -n "$ALIAS" || { echo "Missing ANDROID_SIGNING_KEY_ALIAS"; exit 1; }
-          test -n "$KP" || { echo "Missing ANDROID_SIGNING_KEY_PASSWORD"; exit 1; }
+          test -n "$TOKEN"
+          test -n "$KEYSTORE"
+          test -n "$STORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
 
-      - name: Install GitHub CLI
-        run: gh --version
-
-      - name: Discover and synchronize Android repositories
+      - name: Sync signing secrets
         env:
           GH_TOKEN: ${{ secrets.APKSIGN_SYNC_TOKEN }}
-          SIGNING_KS: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
-          SIGNING_SP: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
-          SIGNING_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
-          SIGNING_KP: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
+          KEYSTORE: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
 
           owner="khahdihdz"
           central="khahdihdz/apksign"
+
           gh repo list "$owner" --limit 1000 --json nameWithOwner,isArchived \
             --jq '.[] | select(.isArchived == false) | .nameWithOwner' > repos.txt
 
@@ -53,62 +51,21 @@ jobs:
             tree="$(gh api "repos/$repo/git/trees/$default_branch?recursive=1" 2>/dev/null || true)"
             [ -n "$tree" ] || continue
 
-            # Detect Android projects by AndroidManifest.xml instead of requiring gradlew.
-            android_manifest="$(printf '%s' "$tree" | jq -r '.tree[]? | select(.type=="blob" and (.path|endswith("src/main/AndroidManifest.xml"))) | .path' | head -n1)"
-            [ -n "$android_manifest" ] || continue
+            manifest="$(printf '%s' "$tree" | jq -r '
+              .tree[]?
+              | select(.type == "blob")
+              | select(.path | endswith("src/main/AndroidManifest.xml"))
+              | .path
+            ' | head -n 1)"
 
-            if printf '%s' "$tree" | jq -e '.tree[]? | select(.type=="blob" and (.path=="settings.gradle" or .path=="settings.gradle.kts"))' >/dev/null; then
-              project_dir="."
-            else
-              project_dir="$(dirname "$(dirname "$(dirname "$android_manifest")")")"
-              [ -n "$project_dir" ] || project_dir="."
-            fi
+            [ -n "$manifest" ] || continue
 
-            echo "Android Gradle project: $repo (manifest=$android_manifest, project-dir=$project_dir)"
+            echo "Syncing Android signing secrets to $repo"
 
-            gh secret set ANDROID_SIGNING_KEYSTORE_BASE64 --repo "$repo" --body "$SIGNING_KS"
-            gh secret set ANDROID_SIGNING_STORE_PASSWORD --repo "$repo" --body "$SIGNING_SP"
-            gh secret set ANDROID_SIGNING_KEY_ALIAS --repo "$repo" --body "$SIGNING_ALIAS"
-            gh secret set ANDROID_SIGNING_KEY_PASSWORD --repo "$repo" --body "$SIGNING_KP"
+            gh secret set ANDROID_SIGNING_KEYSTORE_BASE64 --repo "$repo" --body "$KEYSTORE"
+            gh secret set ANDROID_SIGNING_STORE_PASSWORD --repo "$repo" --body "$STORE_PASSWORD"
+            gh secret set ANDROID_SIGNING_KEY_ALIAS --repo "$repo" --body "$KEY_ALIAS"
+            gh secret set ANDROID_SIGNING_KEY_PASSWORD --repo "$repo" --body "$KEY_PASSWORD"
 
-            body="$(python3 - "$project_dir" <<'PY'
-import json, sys
-project_dir = sys.argv[1]
-data = {
-  "name": "Android shared signing",
-  "on": {
-    "workflow_dispatch": {},
-    "push": {"branches": ["main"]}
-  },
-  "permissions": {"contents": "read"},
-  "jobs": {
-    "sign": {
-      "uses": "khahdihdz/apksign/.github/workflows/android-shared-signing.yml@main",
-      "with": {"project-dir": project_dir},
-      "secrets": {
-        "ANDROID_SIGNING_KEYSTORE_BASE64": "${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}",
-        "ANDROID_SIGNING_STORE_PASSWORD": "${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}",
-        "ANDROID_SIGNING_KEY_ALIAS": "${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}",
-        "ANDROID_SIGNING_KEY_PASSWORD": "${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}"
-      }
-    }
-  }
-}
-print(json.dumps(data, indent=2))
-PY
-)"
-
-            encoded="$(printf '%s' "$body" | base64 -w0)"
-            path=".github/workflows/android-shared-signing.yml"
-            existing="$(gh api "repos/$repo/contents/$path?ref=$default_branch" 2>/dev/null || true)"
-            sha="$(printf '%s' "$existing" | jq -r '.sha // empty')"
-            if [ -n "$sha" ]; then
-              echo "Signing workflow already exists: $repo"
-              continue
-            fi
-
-            gh api -X PUT "repos/$repo/contents/$path" \
-              -f "message=ci: enable centralized Android signing" \
-              -f "content=$encoded" \
-              -f "branch=$default_branch"
-          done
+            echo "Synced: $repo"
+          done < repos.txt
