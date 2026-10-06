@@ -44,7 +44,79 @@ jobs:
           CLEAN_B64="$RUNNER_TEMP/source-signing.b64"
 
           printf '%s' "$KEYSTORE_B64" | tr -d '[:space:]' > "$CLEAN_B64"
-          base64 --decode "$CLEAN_B64" > "$KS"
+
+          # Normalize Base64 padding so secrets generated without trailing "="
+          # are still decoded correctly. Reject any other malformed characters.
+          B64="$(cat "$CLEAN_B64")"
+          if ! printf '%s' "$B64" | grep -Eq '^[A-Za-z0-9+/]*={0,2}
+          keytool -list \
+            -keystore "$KS" \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" >/dev/null
+
+          echo "Source signing keystore validated."
+
+      - name: Sync signing secrets
+        env:
+          GH_TOKEN: ${{ secrets.APKSIGN_SYNC_TOKEN }}
+          KEYSTORE: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          KEY_ALIAS="${KEY_ALIAS:-khahdihdz-release}"
+
+          owner="khahdihdz"
+          central="khahdihdz/apksign"
+
+          gh repo list "$owner" --limit 1000 --json nameWithOwner,isArchived \
+            --jq '.[] | select(.isArchived == false) | .nameWithOwner' > repos.txt
+
+          while IFS= read -r repo; do
+            [ "$repo" = "$central" ] && continue
+
+            default_branch="$(gh api "repos/$repo" --jq '.default_branch')"
+            tree="$(gh api "repos/$repo/git/trees/$default_branch?recursive=1" 2>/dev/null || true)"
+            [ -n "$tree" ] || continue
+
+            manifest="$(printf '%s' "$tree" | jq -r '
+              .tree[]?
+              | select(.type == "blob")
+              | select(.path | endswith("src/main/AndroidManifest.xml"))
+              | .path
+            ' | head -n 1)"
+
+            [ -n "$manifest" ] || continue
+
+            echo "Syncing Android signing secrets to $repo"
+
+            gh secret set ANDROID_SIGNING_KEYSTORE_BASE64 --repo "$repo" --body "$KEYSTORE"
+            gh secret set ANDROID_SIGNING_STORE_PASSWORD --repo "$repo" --body "$STORE_PASSWORD"
+            gh secret set ANDROID_SIGNING_KEY_ALIAS --repo "$repo" --body "$KEY_ALIAS"
+            gh secret set ANDROID_SIGNING_KEY_PASSWORD --repo "$repo" --body "$KEY_PASSWORD"
+
+            echo "Synced: $repo"
+          done < repos.txt
+; then
+            echo "ANDROID_SIGNING_KEYSTORE_BASE64 contains invalid Base64 characters."
+            exit 1
+          fi
+
+          b64_length="$(expr length "$B64")"
+          remainder=$(( b64_length % 4 ))
+          if [ "$remainder" -eq 1 ]; then
+            echo "ANDROID_SIGNING_KEYSTORE_BASE64 has an invalid Base64 length."
+            exit 1
+          elif [ "$remainder" -eq 2 ]; then
+            B64="$B64=="
+          elif [ "$remainder" -eq 3 ]; then
+            B64="$B64="
+          fi
+
+          printf '%s' "$B64" | base64 --decode > "$KS"
           chmod 600 "$KS"
 
           keytool -list \
