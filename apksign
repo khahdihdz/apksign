@@ -186,6 +186,88 @@ EOF
   pause
 }
 
+sync_github_secrets() {
+  header
+  check_java || { pause; return; }
+
+  [[ -f "$KEYSTORE" ]] || {
+    echo -e "$RED Chưa có signing keystore:$NC $KEYSTORE"
+    pause
+    return
+  }
+
+  command -v gh >/dev/null 2>&1 || {
+    echo -e "$RED Chưa có GitHub CLI (gh).$NC"
+    echo "Cài bằng: pkg install gh"
+    pause
+    return
+  }
+
+  gh auth status >/dev/null 2>&1 || {
+    echo -e "$RED GitHub CLI chưa đăng nhập.$NC"
+    echo "Đăng nhập bằng: gh auth login"
+    pause
+    return
+  }
+
+  echo "Keystore: $KEYSTORE"
+  echo "Alias:    $ALIAS"
+  echo
+  echo "Nhập đúng mật khẩu của keystore hiện tại."
+  echo "Mật khẩu sẽ chỉ được dùng trong phiên này và không hiển thị."
+  echo
+
+  read -r -s -p "Keystore password: " STORE_PASSWORD; echo
+  read -r -s -p "Key password: " KEY_PASSWORD; echo
+
+  if ! keytool -list -keystore "$KEYSTORE" -storepass "$STORE_PASSWORD" -alias "$ALIAS" >/dev/null 2>&1; then
+    unset STORE_PASSWORD KEY_PASSWORD
+    echo -e "$RED Không thể mở keystore bằng mật khẩu/alias hiện tại.$NC"
+    echo "Không thay đổi bất kỳ GitHub Secret nào."
+    pause
+    return
+  fi
+
+  echo "Đang tạo Base64 từ keystore hiện tại..."
+  base64 "$KEYSTORE" | tr -d '\\n' > "$BASE64_FILE"
+  chmod 600 "$BASE64_FILE"
+
+  echo "Đang cập nhật 4 secrets trên khahdihdz/apksign..."
+  if ! gh secret set ANDROID_SIGNING_KEYSTORE_BASE64 --repo khahdihdz/apksign < "$BASE64_FILE"; then
+    unset STORE_PASSWORD KEY_PASSWORD
+    echo -e "$RED Cập nhật Base64 thất bại.$NC"
+    pause
+    return
+  fi
+
+  if ! printf '%s' "$STORE_PASSWORD" | gh secret set ANDROID_SIGNING_STORE_PASSWORD --repo khahdihdz/apksign; then
+    unset STORE_PASSWORD KEY_PASSWORD
+    echo -e "$RED Cập nhật STORE_PASSWORD thất bại.$NC"
+    pause
+    return
+  fi
+
+  if ! printf '%s' "$ALIAS" | gh secret set ANDROID_SIGNING_KEY_ALIAS --repo khahdihdz/apksign; then
+    unset STORE_PASSWORD KEY_PASSWORD
+    echo -e "$RED Cập nhật KEY_ALIAS thất bại.$NC"
+    pause
+    return
+  fi
+
+  if ! printf '%s' "$KEY_PASSWORD" | gh secret set ANDROID_SIGNING_KEY_PASSWORD --repo khahdihdz/apksign; then
+    unset STORE_PASSWORD KEY_PASSWORD
+    echo -e "$RED Cập nhật KEY_PASSWORD thất bại.$NC"
+    pause
+    return
+  fi
+
+  unset STORE_PASSWORD KEY_PASSWORD
+  echo -e "$GREEN Đã đồng bộ đủ 4 Android signing secrets.$NC"
+  echo
+  echo "Bước tiếp theo: chạy workflow 'Sync Android signing to all repositories'."
+  pause
+}
+
 install_tools() { header; pkg update -y; pkg install openjdk-17 coreutils -y; java -version; pause; }
 
 while true; do
@@ -198,13 +280,14 @@ while true; do
   echo "6. Kiểm tra APK đã ký"
   echo "7. GitHub Secrets"
   echo "8. Sao lưu keystore"
+  echo "9. Đồng bộ 4 GitHub Secrets"
   echo
   echo "----------------------------------------------"
   echo "© 2026 khahdihdz"
   echo "github.com/khahdihdz/apksign"
   echo "----------------------------------------------"
   echo
-  read -r -p "Chọn [0-8]: " choice
+  read -r -p "Chọn [0-9]: " choice
   case "$choice" in
     1) install_tools ;;
     2) create_keystore ;;
@@ -214,6 +297,7 @@ while true; do
     6) verify_apk ;;
     7) github_secrets ;;
     8) backup_keystore ;;
+    9) sync_github_secrets ;;
     0) clear; exit 0 ;;
     *) echo -e "$RED Lựa chọn không hợp lệ.$NC"; sleep 1 ;;
   esac
