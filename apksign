@@ -61,106 +61,55 @@ sign_apk() {
   check_java || { pause; return; }
   check_apksigner || { pause; return; }
   [[ -f "$KEYSTORE" ]] || { echo -e "$RED Chưa có signing keystore. Hãy chọn 2 trước.$NC"; pause; return; }
-
-  echo "=== Ký APK bất kỳ ==="
-  echo
+  echo "=== Ký APK bất kỳ ==="; echo
   read -r -p "Đường dẫn APK đầu vào: " APK
   APK="${APK/#\~/$HOME}"
   [[ -f "$APK" ]] || { echo -e "$RED Không tìm thấy APK:$NC $APK"; pause; return; }
   [[ "${APK,,}" == *.apk ]] || { echo -e "$RED File phải có đuôi .apk.$NC"; pause; return; }
-
   local dir name stem default_out OUT
-  dir="$(dirname "$APK")"
-  name="$(basename "$APK")"
-  stem="${name%.*}"
-  default_out="$dir/${stem}-signed.apk"
-  read -r -p "APK đầu ra [$default_out]: " OUT
-  OUT="${OUT:-$default_out}"
-  OUT="${OUT/#\~/$HOME}"
-
-  if [[ "$OUT" == "$APK" ]]; then
-    echo -e "$RED Không được ghi đè APK đầu vào.$NC"
-    pause
-    return
-  fi
-
+  dir="$(dirname "$APK")"; name="$(basename "$APK")"; stem="${name%.*}"; default_out="$dir/${stem}-signed.apk"
+  read -r -p "APK đầu ra [$default_out]: " OUT; OUT="${OUT:-$default_out}"; OUT="${OUT/#\~/$HOME}"
+  [[ "$OUT" == "$APK" ]] && { echo -e "$RED Không được ghi đè APK đầu vào.$NC"; pause; return; }
   if [[ -e "$OUT" ]]; then
     read -r -p "File đầu ra đã tồn tại. Ghi đè? [y/N]: " overwrite
     [[ "${overwrite:-N}" =~ ^[Yy]$ ]] || { pause; return; }
     rm -f "$OUT" || { echo -e "$RED Không thể ghi đè file đầu ra.$NC"; pause; return; }
   fi
-
-  echo
-  read -r -s -p "Keystore password: " STORE_PASSWORD; echo
-  read -r -s -p "Key password: " KEY_PASSWORD; echo
-  export APKSIGN_STORE_PASSWORD="$STORE_PASSWORD"
-  export APKSIGN_KEY_PASSWORD="$KEY_PASSWORD"
-  unset STORE_PASSWORD KEY_PASSWORD
-
-  echo
-  echo "Đang ký APK..."
-  apksigner sign \
-    --ks "$KEYSTORE" \
-    --ks-key-alias "$ALIAS" \
-    --ks-pass env:APKSIGN_STORE_PASSWORD \
-    --key-pass env:APKSIGN_KEY_PASSWORD \
-    --out "$OUT" \
-    "$APK"
+  echo; read -r -s -p "Keystore password: " STORE_PASSWORD; echo; read -r -s -p "Key password: " KEY_PASSWORD; echo
+  export APKSIGN_STORE_PASSWORD="$STORE_PASSWORD"; export APKSIGN_KEY_PASSWORD="$KEY_PASSWORD"; unset STORE_PASSWORD KEY_PASSWORD
+  echo; echo "Đang ký APK..."
+  apksigner sign --ks "$KEYSTORE" --ks-key-alias "$ALIAS" --ks-pass env:APKSIGN_STORE_PASSWORD --key-pass env:APKSIGN_KEY_PASSWORD --out "$OUT" "$APK"
   local r=$?
-
   unset APKSIGN_STORE_PASSWORD APKSIGN_KEY_PASSWORD
-
-  if [[ $r -ne 0 ]]; then
-    rm -f "$OUT"
-    echo -e "$RED Ký APK thất bại.$NC"
-    pause
-    return
-  fi
-
-  echo -e "$GREEN Ký APK thành công:$NC"
-  echo "$OUT"
-  echo
-  echo "Đang xác minh chữ ký..."
-  apksigner verify --verbose --print-certs "$OUT"
-  pause
+  if [[ $r -ne 0 ]]; then rm -f "$OUT"; echo -e "$RED Ký APK thất bại.$NC"; pause; return; fi
+  echo -e "$GREEN Ký APK thành công:$NC"; echo "$OUT"; echo; echo "Đang xác minh chữ ký..."; apksigner verify --verbose --print-certs "$OUT"; pause
 }
 
 show_info() {
   header; check_java || { pause; return; }
   [[ -f "$KEYSTORE" ]] || { echo -e "$RED Chưa có keystore.$NC"; pause; return; }
-  keytool -list -v -keystore "$KEYSTORE" -alias "$ALIAS"
-  pause
+  keytool -list -v -keystore "$KEYSTORE" -alias "$ALIAS"; pause
 }
 
 export_base64() {
   header
+  check_java || { pause; return; }
   [[ -f "$KEYSTORE" ]] || { echo -e "$RED Chưa có keystore.$NC"; pause; return; }
-  base64 "$KEYSTORE" | tr -d '\n' > "$BASE64_FILE"
-  chmod 600 "$BASE64_FILE"
-  echo -e "$GREEN Đã tạo:$NC $BASE64_FILE"
-  echo; echo "GitHub Secret: ANDROID_SIGNING_KEYSTORE_BASE64"
-  echo "Giá trị = toàn bộ nội dung file keystore.base64"
-  echo -e "$YELLOW Không commit .jks hoặc Base64 private key vào repo.$NC"
-  pause
+  base64 "$KEYSTORE" | tr -d '\n' > "$BASE64_FILE"; chmod 600 "$BASE64_FILE"
+  echo -e "$GREEN Đã tạo:$NC $BASE64_FILE"; echo; echo "GitHub Secret: ANDROID_SIGNING_KEYSTORE_BASE64"; echo "Giá trị = toàn bộ nội dung file keystore.base64"; echo -e "$YELLOW Không commit .jks hoặc Base64 private key vào repo.$NC"; pause
 }
 
 verify_apk() {
-  header
-  check_apksigner || { pause; return; }
-  read -r -p "Đường dẫn APK: " APK
-  APK="${APK/#\~/$HOME}"
+  header; check_apksigner || { pause; return; }
+  read -r -p "Đường dẫn APK: " APK; APK="${APK/#\~/$HOME}"
   [[ -f "$APK" ]] || { echo -e "$RED Không tìm thấy APK.$NC"; pause; return; }
-  apksigner verify --verbose --print-certs "$APK"
-  pause
+  apksigner verify --verbose --print-certs "$APK"; pause
 }
 
 backup_keystore() {
-  header
-  [[ -f "$KEYSTORE" ]] || { echo -e "$RED Chưa có keystore.$NC"; pause; return; }
-  local d="$HOME/android-signing-backups"; mkdir -p "$d"
-  local f="$d/khahdihdz-release-$(date '+%Y%m%d-%H%M%S').jks"
-  cp "$KEYSTORE" "$f"; chmod 600 "$f"
-  echo -e "$GREEN Đã sao lưu:$NC $f"; pause
+  header; [[ -f "$KEYSTORE" ]] || { echo -e "$RED Chưa có keystore.$NC"; pause; return; }
+  local d="$HOME/android-signing-backups"; mkdir -p "$d"; local f="$d/khahdihdz-release-$(date '+%Y%m%d-%H%M%S').jks"
+  cp "$KEYSTORE" "$f"; chmod 600 "$f"; echo -e "$GREEN Đã sao lưu:$NC $f"; pause
 }
 
 github_secrets() {
@@ -168,17 +117,10 @@ github_secrets() {
   cat <<EOF
 4 GitHub Secrets dùng chung:
 
-1. ANDROID_SIGNING_KEYSTORE_BASE64
-   = nội dung ~/.apksign/keystore.base64
-
-2. ANDROID_SIGNING_STORE_PASSWORD
-   = mật khẩu keystore
-
-3. ANDROID_SIGNING_KEY_ALIAS
-   = $ALIAS
-
-4. ANDROID_SIGNING_KEY_PASSWORD
-   = mật khẩu key
+1. ANDROID_SIGNING_KEYSTORE_BASE64 = nội dung ~/.apksign/keystore.base64
+2. ANDROID_SIGNING_STORE_PASSWORD = mật khẩu keystore
+3. ANDROID_SIGNING_KEY_ALIAS = $ALIAS
+4. ANDROID_SIGNING_KEY_PASSWORD = mật khẩu key
 
 Dùng cùng 4 secret cho mọi Android repo.
 KHÔNG commit private keystore vào repository.
@@ -189,33 +131,12 @@ EOF
 sync_github_secrets() {
   header
   check_java || { pause; return; }
+  [[ -f "$KEYSTORE" ]] || { echo -e "$RED Chưa có signing keystore:$NC $KEYSTORE"; pause; return; }
+  command -v gh >/dev/null 2>&1 || { echo -e "$RED Chưa có GitHub CLI (gh).$NC"; echo "Cài bằng: pkg install gh"; pause; return; }
+  gh auth status >/dev/null 2>&1 || { echo -e "$RED GitHub CLI chưa đăng nhập.$NC"; echo "Đăng nhập bằng: gh auth login"; pause; return; }
 
-  [[ -f "$KEYSTORE" ]] || {
-    echo -e "$RED Chưa có signing keystore:$NC $KEYSTORE"
-    pause
-    return
-  }
-
-  command -v gh >/dev/null 2>&1 || {
-    echo -e "$RED Chưa có GitHub CLI (gh).$NC"
-    echo "Cài bằng: pkg install gh"
-    pause
-    return
-  }
-
-  gh auth status >/dev/null 2>&1 || {
-    echo -e "$RED GitHub CLI chưa đăng nhập.$NC"
-    echo "Đăng nhập bằng: gh auth login"
-    pause
-    return
-  }
-
-  echo "Keystore: $KEYSTORE"
-  echo "Alias:    $ALIAS"
-  echo
-  echo "Nhập đúng mật khẩu của keystore hiện tại."
-  echo "Mật khẩu sẽ chỉ được dùng trong phiên này và không hiển thị."
-  echo
+  echo "Keystore: $KEYSTORE"; echo "Alias:    $ALIAS"; echo
+  echo "Nhập đúng mật khẩu của keystore hiện tại."; echo
 
   read -r -s -p "Keystore password: " STORE_PASSWORD; echo
   read -r -s -p "Key password: " KEY_PASSWORD; echo
@@ -223,47 +144,52 @@ sync_github_secrets() {
   if ! keytool -list -keystore "$KEYSTORE" -storepass "$STORE_PASSWORD" -alias "$ALIAS" >/dev/null 2>&1; then
     unset STORE_PASSWORD KEY_PASSWORD
     echo -e "$RED Không thể mở keystore bằng mật khẩu/alias hiện tại.$NC"
-    echo "Không thay đổi bất kỳ GitHub Secret nào."
-    pause
-    return
+    echo "Không thay đổi bất kỳ GitHub Secret nào."; pause; return
   fi
 
   echo "Đang tạo Base64 từ keystore hiện tại..."
-  base64 "$KEYSTORE" | tr -d '\\n' > "$BASE64_FILE"
-  chmod 600 "$BASE64_FILE"
+  base64 "$KEYSTORE" | tr -d '\n' > "$BASE64_FILE"; chmod 600 "$BASE64_FILE"
 
   echo "Đang cập nhật 4 secrets trên khahdihdz/apksign..."
-  if ! gh secret set ANDROID_SIGNING_KEYSTORE_BASE64 --repo khahdihdz/apksign < "$BASE64_FILE"; then
+  local failed=0
+  if ! gh secret set ANDROID_SIGNING_KEYSTORE_BASE64 --repo khahdihdz/apksign < "$BASE64_FILE"; then failed=1; fi
+  if ! printf '%s' "$STORE_PASSWORD" | gh secret set ANDROID_SIGNING_STORE_PASSWORD --repo khahdihdz/apksign; then failed=1; fi
+  if ! printf '%s' "$ALIAS" | gh secret set ANDROID_SIGNING_KEY_ALIAS --repo khahdihdz/apksign; then failed=1; fi
+  if ! printf '%s' "$KEY_PASSWORD" | gh secret set ANDROID_SIGNING_KEY_PASSWORD --repo khahdihdz/apksign; then failed=1; fi
+
+  if [[ $failed -ne 0 ]]; then
     unset STORE_PASSWORD KEY_PASSWORD
-    echo -e "$RED Cập nhật Base64 thất bại.$NC"
-    pause
-    return
+    echo -e "$RED Có secret cập nhật thất bại. Không thể xác nhận đồng bộ hoàn tất.$NC"
+    pause; return
   fi
 
-  if ! printf '%s' "$STORE_PASSWORD" | gh secret set ANDROID_SIGNING_STORE_PASSWORD --repo khahdihdz/apksign; then
-    unset STORE_PASSWORD KEY_PASSWORD
-    echo -e "$RED Cập nhật STORE_PASSWORD thất bại.$NC"
-    pause
-    return
+  echo "Đã gửi đủ 4 secrets. Đang xác minh an toàn..."
+  local verify_dir="$KEYSTORE_DIR/.verify-$$"
+  mkdir -p "$verify_dir"; chmod 700 "$verify_dir"
+  local verify_ks="$verify_dir/source.jks"
+  local verify_b64="$verify_dir/source.b64"
+  base64 "$KEYSTORE" | tr -d '\n' > "$verify_b64"
+  printf '%s' "$STORE_PASSWORD" > "$verify_dir/store.pass"
+  printf '%s' "$KEY_PASSWORD" > "$verify_dir/key.pass"
+  chmod 600 "$verify_b64" "$verify_dir/store.pass" "$verify_dir/key.pass"
+
+  if ! base64 --decode "$verify_b64" > "$verify_ks" 2>/dev/null; then
+    rm -rf "$verify_dir"; unset STORE_PASSWORD KEY_PASSWORD
+    echo -e "$RED Xác minh Base64 local thất bại.$NC"; pause; return
+  fi
+  if ! keytool -list -keystore "$verify_ks" -storepass "$STORE_PASSWORD" -alias "$ALIAS" >/dev/null 2>&1; then
+    rm -rf "$verify_dir"; unset STORE_PASSWORD KEY_PASSWORD
+    echo -e "$RED Xác minh keystore/Base64/password thất bại.$NC"; pause; return
+  fi
+  if ! keytool -importkeystore -srckeystore "$verify_ks" -srcstorepass "$STORE_PASSWORD" -srcalias "$ALIAS" -destkeystore "$verify_dir/check.jks" -deststorepass "$STORE_PASSWORD" -destalias "$ALIAS" -destkeypass "$KEY_PASSWORD" >/dev/null 2>&1; then
+    rm -rf "$verify_dir"; unset STORE_PASSWORD KEY_PASSWORD
+    echo -e "$RED Xác minh Key password thất bại.$NC"; pause; return
   fi
 
-  if ! printf '%s' "$ALIAS" | gh secret set ANDROID_SIGNING_KEY_ALIAS --repo khahdihdz/apksign; then
-    unset STORE_PASSWORD KEY_PASSWORD
-    echo -e "$RED Cập nhật KEY_ALIAS thất bại.$NC"
-    pause
-    return
-  fi
-
-  if ! printf '%s' "$KEY_PASSWORD" | gh secret set ANDROID_SIGNING_KEY_PASSWORD --repo khahdihdz/apksign; then
-    unset STORE_PASSWORD KEY_PASSWORD
-    echo -e "$RED Cập nhật KEY_PASSWORD thất bại.$NC"
-    pause
-    return
-  fi
-
+  rm -rf "$verify_dir"
   unset STORE_PASSWORD KEY_PASSWORD
-  echo -e "$GREEN Đã đồng bộ đủ 4 Android signing secrets.$NC"
-  echo
+  echo -e "$GREEN Đã đồng bộ và xác minh đủ 4 Android signing secrets.$NC"
+  echo "Keystore + Store Password + Alias + Key Password là cùng một bộ."
   echo "Bước tiếp theo: chạy workflow 'Sync Android signing to all repositories'."
   pause
 }
