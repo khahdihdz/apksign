@@ -53,13 +53,18 @@ jobs:
             tree="$(gh api "repos/$repo/git/trees/$default_branch?recursive=1" 2>/dev/null || true)"
             [ -n "$tree" ] || continue
 
-            gradlew="$(printf '%s' "$tree" | jq -r '.tree[]? | select(.type=="blob" and ((.path|endswith("/gradlew")) or .path=="gradlew")) | .path' | head -n1)"
-            [ -n "$gradlew" ] || continue
+            # Detect Android projects by AndroidManifest.xml instead of requiring gradlew.
+            android_manifest="$(printf '%s' "$tree" | jq -r '.tree[]? | select(.type=="blob" and (.path|endswith("src/main/AndroidManifest.xml"))) | .path' | head -n1)"
+            [ -n "$android_manifest" ] || continue
 
-            project_dir="$(dirname "$gradlew")"
-            [ "$project_dir" = "." ] && project_dir="."
+            if printf '%s' "$tree" | jq -e '.tree[]? | select(.type=="blob" and (.path=="settings.gradle" or .path=="settings.gradle.kts"))' >/dev/null; then
+              project_dir="."
+            else
+              project_dir="$(dirname "$(dirname "$(dirname "$android_manifest")")")"
+              [ -n "$project_dir" ] || project_dir="."
+            fi
 
-            echo "Android Gradle project: $repo (project-dir=$project_dir)"
+            echo "Android Gradle project: $repo (manifest=$android_manifest, project-dir=$project_dir)"
 
             gh secret set ANDROID_SIGNING_KEYSTORE_BASE64 --repo "$repo" --body "$SIGNING_KS"
             gh secret set ANDROID_SIGNING_STORE_PASSWORD --repo "$repo" --body "$SIGNING_SP"
@@ -102,8 +107,8 @@ PY
               continue
             fi
 
-            args=(-X PUT "repos/$repo/contents/$path" -f "message=ci: enable centralized Android signing" -f "content=$encoded" -f "branch=$default_branch")
-            [ -n "$sha" ] && args+=(-f "sha=$sha")
-
-            gh api "${args[@]}"
+            gh api -X PUT "repos/$repo/contents/$path" \
+              -f "message=ci: enable centralized Android signing" \
+              -f "content=$encoded" \
+              -f "branch=$default_branch"
           done
