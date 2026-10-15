@@ -46,16 +46,17 @@ jobs:
       - name: Build release
         run: ./gradlew ${{ inputs.gradle-task }}
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          accept-android-sdk-licenses: true
-
       - name: Install Android Build Tools
         shell: bash
         run: |
           set -euo pipefail
-          sdkmanager --install "platform-tools" "build-tools;35.0.0"
+          sdkmanager_bin="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$sdkmanager_bin" ]; then
+            sdkmanager_bin="$(command -v sdkmanager)"
+          fi
+          test -x "$sdkmanager_bin"
+          yes | "$sdkmanager_bin" --licenses >/dev/null
+          "$sdkmanager_bin" --install "platform-tools" "build-tools;35.0.0"
 
       - name: Add Android Build Tools to PATH
         shell: bash
