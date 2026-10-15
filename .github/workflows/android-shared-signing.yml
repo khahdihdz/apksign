@@ -43,7 +43,7 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
-      - name: Decode and validate shared signing key
+      - name: Decode, validate, and normalize shared signing key
         env:
           KS: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
@@ -62,27 +62,35 @@ jobs:
 
           if ! keytool -list -keystore release.jks -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>"$RUNNER_TEMP/keystore-check.log"; then
             echo "ERROR: Cannot open the signing keystore or find the configured alias."
-            echo "Check ANDROID_SIGNING_KEYSTORE_BASE64, ANDROID_SIGNING_STORE_PASSWORD, and ANDROID_SIGNING_KEY_ALIAS in the source apksign repository."
+            echo "Check ANDROID_SIGNING_KEYSTORE_BASE64, ANDROID_SIGNING_STORE_PASSWORD, and ANDROID_SIGNING_KEY_ALIAS in khahdihdz/apksign."
             exit 1
           fi
 
+          # Normalize the validated private key into PKCS12 and use this exact
+          # file for signing, rather than validating a conversion and then
+          # asking apksigner to reopen the original keystore.
           if ! keytool -importkeystore \
             -srckeystore release.jks \
+            -srcstoretype JKS \
             -srcstorepass "$STORE_PASSWORD" \
             -srcalias "$KEY_ALIAS" \
             -srckeypass "$KEY_PASSWORD" \
-            -destkeystore "$RUNNER_TEMP/signing-key-check.p12" \
+            -destkeystore "$RUNNER_TEMP/release-signing.p12" \
             -deststoretype PKCS12 \
             -deststorepass "$STORE_PASSWORD" \
             -destalias "$KEY_ALIAS" \
             -destkeypass "$KEY_PASSWORD" \
             -noprompt >/dev/null 2>"$RUNNER_TEMP/key-password-check.log"; then
-            echo "ERROR: ANDROID_SIGNING_KEY_PASSWORD does not unlock the private key for the configured alias."
-            echo "Correct the central secret in khahdihdz/apksign, then rerun the signing workflow."
+            echo "ERROR: Could not import the private key. Check the keystore and private-key password secrets in khahdihdz/apksign."
             exit 1
           fi
-          rm -f "$RUNNER_TEMP/signing-key-check.p12"
-          echo "Signing keystore, alias, and private-key password validated."
+          chmod 600 "$RUNNER_TEMP/release-signing.p12"
+
+          if ! keytool -list -keystore "$RUNNER_TEMP/release-signing.p12" -storetype PKCS12 -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+            echo "ERROR: Normalized PKCS12 keystore validation failed."
+            exit 1
+          fi
+          echo "Signing keystore and private key validated and normalized."
 
       - name: Build release
         run: ./gradlew ${{ inputs.gradle-task }}
@@ -96,8 +104,6 @@ jobs:
             sdkmanager_bin="$(command -v sdkmanager)"
           fi
           test -x "$sdkmanager_bin"
-          # Feed license answers without a pipeline so pipefail does not turn
-          # an early sdkmanager exit into a false failure (yes: Broken pipe).
           "$sdkmanager_bin" --licenses < <(yes) >/dev/null
           "$sdkmanager_bin" --install "platform-tools" "build-tools;35.0.0"
 
@@ -118,6 +124,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          keystore="$RUNNER_TEMP/release-signing.p12"
+          test -s "$keystore" || { echo "ERROR: normalized signing keystore is missing."; exit 1; }
+
           mapfile -t apks < <(find . -type f -path '*/build/outputs/apk/release/*.apk' ! -path './signed-apks/*' -print | sort)
           if [ ${#apks[@]} -eq 0 ]; then
             echo "No release APK found under any */build/outputs/apk/release/ directory."
@@ -132,7 +141,8 @@ jobs:
             signed="signed-apks/${name%.apk}-signed.apk"
             zipalign -f -p 4 "$apk" "$aligned"
             apksigner sign \
-              --ks release.jks \
+              --ks "$keystore" \
+              --ks-type PKCS12 \
               --ks-key-alias "$KEY_ALIAS" \
               --ks-pass env:STORE_PASSWORD \
               --key-pass env:KEY_PASSWORD \
