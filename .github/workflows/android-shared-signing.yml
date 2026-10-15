@@ -66,31 +66,43 @@ jobs:
             exit 1
           fi
 
-          # Normalize the validated private key into PKCS12 and use this exact
-          # file for signing, rather than validating a conversion and then
-          # asking apksigner to reopen the original keystore.
-          if ! keytool -importkeystore \
-            -srckeystore release.jks \
-            -srcstoretype JKS \
-            -srcstorepass "$STORE_PASSWORD" \
-            -srcalias "$KEY_ALIAS" \
-            -srckeypass "$KEY_PASSWORD" \
-            -destkeystore "$RUNNER_TEMP/release-signing.p12" \
-            -deststoretype PKCS12 \
-            -deststorepass "$STORE_PASSWORD" \
-            -destalias "$KEY_ALIAS" \
-            -destkeypass "$KEY_PASSWORD" \
-            -noprompt >/dev/null 2>"$RUNNER_TEMP/key-password-check.log"; then
-            echo "ERROR: Could not import the private key. Check the keystore and private-key password secrets in khahdihdz/apksign."
-            exit 1
-          fi
-          chmod 600 "$RUNNER_TEMP/release-signing.p12"
+          # The uploaded keystore may be JKS or PKCS12 regardless of its filename.
+          # Try both source formats and both common key-password configurations.
+          # The output PKCS12 uses the store password for both store and key.
+          normalized="$RUNNER_TEMP/release-signing.p12"
+          imported=false
+          for source_type in JKS PKCS12; do
+            for source_key_password in "$KEY_PASSWORD" "$STORE_PASSWORD"; do
+              rm -f "$normalized"
+              if keytool -importkeystore \
+                -srckeystore release.jks \
+                -srcstoretype "$source_type" \
+                -srcstorepass "$STORE_PASSWORD" \
+                -srcalias "$KEY_ALIAS" \
+                -srckeypass "$source_key_password" \
+                -destkeystore "$normalized" \
+                -deststoretype PKCS12 \
+                -deststorepass "$STORE_PASSWORD" \
+                -destalias "$KEY_ALIAS" \
+                -destkeypass "$STORE_PASSWORD" \
+                -noprompt >/dev/null 2>"$RUNNER_TEMP/key-password-check.log"; then
+                if keytool -list -keystore "$normalized" -storetype PKCS12 -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+                  imported=true
+                  break 2
+                fi
+              fi
+            done
+          done
 
-          if ! keytool -list -keystore "$RUNNER_TEMP/release-signing.p12" -storetype PKCS12 -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
-            echo "ERROR: Normalized PKCS12 keystore validation failed."
+          if [ "$imported" != true ]; then
+            echo "ERROR: Signing keystore was decoded and its store password/alias were accepted, but the private key could not be imported."
+            echo "Tried source formats JKS and PKCS12, with the configured key password and store password."
+            echo "Verify ANDROID_SIGNING_KEY_PASSWORD matches this exact keystore. Do not replace the keystore if you need to preserve app update compatibility."
             exit 1
           fi
-          echo "Signing keystore and private key validated and normalized."
+          chmod 600 "$normalized"
+          echo "Signing keystore validated and normalized to PKCS12."
+
 
       - name: Build release
         run: ./gradlew ${{ inputs.gradle-task }}
@@ -145,7 +157,7 @@ jobs:
               --ks-type PKCS12 \
               --ks-key-alias "$KEY_ALIAS" \
               --ks-pass env:STORE_PASSWORD \
-              --key-pass env:KEY_PASSWORD \
+              --key-pass env:STORE_PASSWORD \
               --out "$signed" \
               "$aligned"
             apksigner verify --verbose --print-certs "$signed"
