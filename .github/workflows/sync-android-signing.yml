@@ -112,7 +112,22 @@ jobs:
           owner="khahdihdz"
           central="khahdihdz/apksign"
 
-          gh repo list "$owner" --limit 1000 --json nameWithOwner,isArchived             --jq '.[] | select(.isArchived == false) | .nameWithOwner' > repos.txt
+          # Query public and private repositories separately. Private repositories are
+          # visible only if APKSIGN_SYNC_TOKEN has access to them.
+          : > repos.txt
+          for visibility in public private; do
+            gh repo list "$owner" --visibility "$visibility" --limit 1000 \
+              --json nameWithOwner,isArchived \
+              --jq '.[] | select(.isArchived == false) | .nameWithOwner' \
+              >> repos.txt
+          done
+          sort -u repos.txt -o repos.txt
+
+          echo "Repositories visible to sync token: $(wc -l < repos.txt | tr -d ' ')"
+          if ! grep -Fxq "khahdihdz/qqfarm-android" repos.txt; then
+            echo "WARNING: khahdihdz/qqfarm-android is not visible to APKSIGN_SYNC_TOKEN."
+            echo "Check that the token has access to this private repository and can manage Actions secrets."
+          fi
 
           while IFS= read -r repo; do
             [ "$repo" = "$central" ] && continue
