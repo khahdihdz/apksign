@@ -32,6 +32,7 @@ jobs:
           KEYSTORE_B64: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
@@ -93,7 +94,26 @@ jobs:
             exit 1
           fi
 
-          echo "Source signing keystore validated successfully."
+          # Validate the private-key password too, not only the store password.
+          # This prevents reporting "Synced" for a credential set that apksigner cannot use.
+          if ! keytool -importkeystore \
+            -srckeystore "$KS" \
+            -srcstorepass "$STORE_PASSWORD" \
+            -srcalias "$KEY_ALIAS" \
+            -srckeypass "$KEY_PASSWORD" \
+            -destkeystore "$RUNNER_TEMP/key-password-check.p12" \
+            -deststoretype PKCS12 \
+            -deststorepass "$STORE_PASSWORD" \
+            -destalias "$KEY_ALIAS" \
+            -destkeypass "$KEY_PASSWORD" \
+            -noprompt >/dev/null 2>"$RUNNER_TEMP/key-password-error.txt"; then
+            echo "ERROR: ANDROID_SIGNING_KEY_PASSWORD does not unlock the private key for alias '$KEY_ALIAS'."
+            echo "No repository secrets were synced. Correct the central apksign key password and rerun."
+            exit 1
+          fi
+          rm -f "$RUNNER_TEMP/key-password-check.p12"
+
+          echo "Source signing keystore and private-key password validated successfully."
           echo "Keystore alias validated: $KEY_ALIAS"
 
       - name: Sync signing secrets
