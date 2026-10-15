@@ -48,6 +48,9 @@ jobs:
 
       - name: Install Android Build Tools
         uses: android-actions/setup-android@v3
+        with:
+          # Google has retired the legacy SDK 'tools' package; install only supported packages.
+          packages: platform-tools
 
       - name: Decode shared signing key
         env:
