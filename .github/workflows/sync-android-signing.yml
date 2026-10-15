@@ -121,20 +121,26 @@ jobs:
               --jq '.[] | select(.isArchived == false) | .nameWithOwner' \
               >> repos.txt
           done
+          # Always include this known private Android repository explicitly.
+          # Repository listing cannot reveal private repos the token cannot access.
+          echo "khahdihdz/qqfarm-android" >> repos.txt
           sort -u repos.txt -o repos.txt
 
-          echo "Repositories visible to sync token: $(wc -l < repos.txt | tr -d ' ')"
-          if ! grep -Fxq "khahdihdz/qqfarm-android" repos.txt; then
-            echo "WARNING: khahdihdz/qqfarm-android is not visible to APKSIGN_SYNC_TOKEN."
-            echo "Check that the token has access to this private repository and can manage Actions secrets."
-          fi
+          echo "Repositories queued for sync: $(wc -l < repos.txt | tr -d ' ')"
 
           while IFS= read -r repo; do
             [ "$repo" = "$central" ] && continue
 
-            default_branch="$(gh api "repos/$repo" --jq '.default_branch')"
+            if ! repo_meta="$(gh api "repos/$repo" 2>&1)"; then
+              echo "WARNING: Cannot access $repo with APKSIGN_SYNC_TOKEN."
+              echo "Grant the token access to this private repository and Actions secrets: write permission."
+              continue
+            fi
+            default_branch="$(printf '%s' "$repo_meta" | jq -r '.default_branch // empty')"
+            [ -n "$default_branch" ] || { echo "WARNING: Cannot determine default branch for $repo"; continue; }
+
             tree="$(gh api "repos/$repo/git/trees/$default_branch?recursive=1" 2>/dev/null || true)"
-            [ -n "$tree" ] || continue
+            [ -n "$tree" ] || { echo "WARNING: Cannot read repository tree for $repo"; continue; }
 
             manifest="$(printf '%s' "$tree" | jq -r '
               .tree[]?
