@@ -43,6 +43,47 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
+      - name: Decode and validate shared signing key
+        env:
+          KS: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$KS" || { echo "ERROR: signing keystore secret is empty."; exit 1; }
+          test -n "$STORE_PASSWORD" || { echo "ERROR: keystore password secret is empty."; exit 1; }
+          test -n "$KEY_ALIAS" || { echo "ERROR: key alias secret is empty."; exit 1; }
+          test -n "$KEY_PASSWORD" || { echo "ERROR: private-key password secret is empty."; exit 1; }
+
+          printf '%s' "$KS" | tr -d '[:space:]' | base64 --decode > release.jks
+          chmod 600 release.jks
+
+          if ! keytool -list -keystore release.jks -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>"$RUNNER_TEMP/keystore-check.log"; then
+            echo "ERROR: Cannot open the signing keystore or find the configured alias."
+            echo "Check ANDROID_SIGNING_KEYSTORE_BASE64, ANDROID_SIGNING_STORE_PASSWORD, and ANDROID_SIGNING_KEY_ALIAS in the source apksign repository."
+            exit 1
+          fi
+
+          if ! keytool -importkeystore \
+            -srckeystore release.jks \
+            -srcstorepass "$STORE_PASSWORD" \
+            -srcalias "$KEY_ALIAS" \
+            -srckeypass "$KEY_PASSWORD" \
+            -destkeystore "$RUNNER_TEMP/signing-key-check.p12" \
+            -deststoretype PKCS12 \
+            -deststorepass "$STORE_PASSWORD" \
+            -destalias "$KEY_ALIAS" \
+            -destkeypass "$KEY_PASSWORD" \
+            -noprompt >/dev/null 2>"$RUNNER_TEMP/key-password-check.log"; then
+            echo "ERROR: ANDROID_SIGNING_KEY_PASSWORD does not unlock the private key for the configured alias."
+            echo "Correct the central secret in khahdihdz/apksign, then rerun the signing workflow."
+            exit 1
+          fi
+          rm -f "$RUNNER_TEMP/signing-key-check.p12"
+          echo "Signing keystore, alias, and private-key password validated."
+
       - name: Build release
         run: ./gradlew ${{ inputs.gradle-task }}
 
@@ -68,14 +109,6 @@ jobs:
           test -x "$tools_dir/zipalign"
           test -x "$tools_dir/apksigner"
           echo "$tools_dir" >> "$GITHUB_PATH"
-
-      - name: Decode shared signing key
-        env:
-          KS: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
-        run: |
-          test -n "$KS"
-          printf '%s' "$KS" | base64 --decode > release.jks
-          chmod 600 release.jks
 
       - name: Sign release APKs
         env:
