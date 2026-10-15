@@ -50,7 +50,16 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           # Google has retired the legacy SDK 'tools' package; install only supported packages.
-          packages: platform-tools
+          packages: platform-tools,build-tools;35.0.0
+
+      - name: Add Android Build Tools to PATH
+        shell: bash
+        run: |
+          set -euo pipefail
+          tools_dir="$ANDROID_HOME/build-tools/35.0.0"
+          test -x "$tools_dir/zipalign"
+          test -x "$tools_dir/apksigner"
+          echo "$tools_dir" >> "$GITHUB_PATH"
 
       - name: Decode shared signing key
         env:
@@ -68,10 +77,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          apks=(build/outputs/apk/release/*.apk)
+          mapfile -t apks < <(find . -type f -path '*/build/outputs/apk/release/*.apk' ! -path './signed-apks/*' -print | sort)
           if [ ${#apks[@]} -eq 0 ]; then
-            echo "No release APK found under build/outputs/apk/release/"
+            echo "No release APK found under any */build/outputs/apk/release/ directory."
             find . -path '*/build/outputs/apk/*/*.apk' -print || true
             exit 1
           fi
