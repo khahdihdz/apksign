@@ -144,6 +144,8 @@ jobs:
           # Always include this known private Android repository explicitly.
           # Repository listing cannot reveal private repos the token cannot access.
           echo "khahdihdz/qqfarm-android" >> repos.txt
+          # Explicitly include CallerID even if GitHub repository listing is paginated or filtered.
+          echo "khahdihdz/callerid" >> repos.txt
           sort -u repos.txt -o repos.txt
 
           echo "Repositories queued for sync: $(wc -l < repos.txt | tr -d ' ')"
