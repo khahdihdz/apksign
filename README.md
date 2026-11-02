@@ -210,3 +210,17 @@ Phát hành theo giấy phép **MIT**.
 Website: https://khahdihdz.github.io/
 
 [Repository apksign](https://github.com/khahdihdz/apksign)
+
+
+## ☁️ Sao lưu Google Drive
+
+Menu **10. Sao lưu Keystore + GitHub Secrets lên Google Drive** hỗ trợ:
+
+- Cấu hình Google Drive bằng [rclone](https://rclone.org/drive/) và OAuth.
+- Sao lưu keystore JKS, Base64 và 4 Android signing secrets vào một archive.
+- Mã hóa archive cục bộ bằng AES-256-CBC + PBKDF2 (300.000 vòng) trước khi tải lên Drive.
+- Khôi phục keystore từ bản backup đã mã hóa; secrets được khôi phục cục bộ tại `~/.apksign/backup-secrets.env`.
+
+Lần đầu chọn menu 10 → 1 để cài rclone và cấu hình remote tên `gdrive`; sau đó chọn 10 → 2 để sao lưu. Chọn 10 → 3 để khôi phục.
+
+**Bảo mật:** GitHub không cho đọc lại giá trị Actions Secrets đã lưu. Khi sao lưu, hãy nhập lại đúng mật khẩu hiện tại. Không tải archive chưa mã hóa lên Drive, không chia sẻ mật khẩu backup, và giữ thêm một bản sao ngoại tuyến. Khôi phục không tự động ghi đè GitHub Secrets.
