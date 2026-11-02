@@ -48,7 +48,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Make Gradle executable
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Make Gradle wrapper executable
+        if: ${{ hashFiles(format('{0}/gradlew', inputs.project-dir)) != '' }}
         run: chmod +x ./gradlew
 
       - name: Decode, validate, and normalize shared signing key
@@ -116,7 +122,12 @@ jobs:
         env:
           APP_VERSION_CODE: ${{ inputs.version-code }}
           APP_VERSION_NAME: ${{ inputs.version-name }}
-        run: ./gradlew ${{ inputs.gradle-task }}
+        run: |
+          if [ -x ./gradlew ]; then
+            ./gradlew ${{ inputs.gradle-task }}
+          else
+            gradle ${{ inputs.gradle-task }}
+          fi
 
       - name: Install Android Build Tools
         shell: bash
