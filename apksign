@@ -207,6 +207,7 @@ while true; do
   echo "7. GitHub Secrets"
   echo "8. Sao lưu keystore"
   echo "9. Đồng bộ 4 GitHub Secrets"
+  echo "10. Sao lưu Keystore + GitHub Secrets lên Google Drive"
   echo
   echo "----------------------------------------------"
   echo "© 2026 khahdihdz"
@@ -224,6 +225,7 @@ while true; do
     7) github_secrets ;;
     8) backup_keystore ;;
     9) sync_github_secrets ;;
+    10) "$HOME/apksign/drive-backup" ;;
     0) clear; exit 0 ;;
     *) echo -e "$RED Lựa chọn không hợp lệ.$NC"; sleep 1 ;;
   esac
