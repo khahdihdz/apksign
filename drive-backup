@@ -48,7 +48,7 @@ EOF
   read -r -s -p "Mật khẩu mã hóa bản backup (ít nhất 12 ký tự): " PASS; echo
   [[ ${#PASS} -ge 12 ]] || { unset PASS; echo "Mật khẩu quá ngắn."; return 1; }
   ARCHIVE="$ROOT/apksign-backup-$(date '+%Y%m%d-%H%M%S').tar.gz.enc"
-  tar -czf - -C "$TMP" . | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 300000 -md sha256 -pass stdin -out "$ARCHIVE" <<< "$PASS"
+  export APKSIGN_BACKUP_PASSWORD="$PASS"\n  tar -czf - -C "$TMP" . | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 300000 -md sha256 -pass env:APKSIGN_BACKUP_PASSWORD -out "$ARCHIVE"\n  unset APKSIGN_BACKUP_PASSWORD
   unset PASS
   chmod 600 "$ARCHIVE"
   echo "Đang tải bản backup đã mã hóa lên Google Drive..."
@@ -66,7 +66,7 @@ restore(){
   TMP="$(mktemp -d "$ROOT/restore.XXXXXX")"; chmod 700 "$TMP"
   rclone copyto "$REMOTE/$NAME" "$TMP/backup.enc"
   read -r -s -p "Mật khẩu giải mã: " PASS; echo
-  if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 300000 -md sha256 -pass stdin -in "$TMP/backup.enc" <<< "$PASS" | tar -xz -C "$TMP"; then
+  export APKSIGN_BACKUP_PASSWORD="$PASS"\n  if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 300000 -md sha256 -pass env:APKSIGN_BACKUP_PASSWORD -in "$TMP/backup.enc" | tar -xz -C "$TMP"; then
     unset PASS; echo "Giải mã thất bại. Kiểm tra mật khẩu hoặc file."; return 1
   fi
   unset PASS
@@ -74,7 +74,7 @@ restore(){
   mkdir -p "$ROOT"
   [[ ! -e "$KEYSTORE" ]] || cp "$KEYSTORE" "$KEYSTORE.before-restore-$(date +%s)"
   cp "$TMP/khahdihdz-release.jks" "$KEYSTORE"; chmod 600 "$KEYSTORE"
-  cp "$TMP/keystore.base64" "$B64"; chmod 600 "$B64"
+  cp "$TMP/keystore.base64" "$B64"; chmod 600 "$B64"\n  cp "$TMP/github-secrets.env" "$ROOT/backup-secrets.env"; chmod 600 "$ROOT/backup-secrets.env"
   echo "Đã khôi phục keystore và Base64 vào $ROOT"
   echo "Secrets nằm trong github-secrets.env của bản giải nén tạm; xem nội dung chỉ khi cần."
   echo "Không tự động ghi secrets lên GitHub để tránh ghi đè nhầm."
