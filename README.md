@@ -49,14 +49,12 @@ Installer tạo lệnh trong Termux PATH và giữ dữ liệu signing trong `~/
 
 ## 🧭 Thiết lập lần đầu
 
-Ở lần mở `apksign` đầu tiên, chương trình tự chạy trình hướng dẫn:
-- Kiểm tra và hỏi trước khi cài OpenJDK 17 + Coreutils (quản lý keystore).
-- Hỏi cài GitHub CLI (`gh`) nếu muốn dùng mục 9.
-- Hỏi cài `rclone`, `openssl`, `tar` nếu muốn dùng mục 10.
-- Giới thiệu Termux:API (tùy chọn) để nhận thông báo Android.
-- Không tự tạo keystore, không tự đăng nhập GitHub/Google và không tự thay đổi secrets.
+Ở lần mở `apksign` đầu tiên, chương trình hiển thị lựa chọn:
+1. **Cài tất cả gói cần thiết** – OpenJDK 17, Coreutils, GitHub CLI, rclone, OpenSSL và tar.
+2. **Chọn nhóm gói muốn cài** – chọn riêng nhóm quản lý keystore, GitHub hoặc Google Drive.
+3. **Bỏ qua** – vào menu chính và cài bổ sung sau bằng mục 11.
 
-Bạn có thể bỏ qua gói chưa cần dùng. Chạy lại **mục 11 – Kiểm tra/cài đặt gói cần thiết** bất cứ lúc nào để kiểm tra và cài bổ sung. Trình hướng dẫn lần đầu chỉ tự xuất hiện một lần; lựa chọn cài gói được hỏi trước khi thực hiện.
+Việc cài đặt chỉ bắt đầu sau khi bạn chọn. Termux:API là tùy chọn riêng để nhận thông báo Android. Trình hướng dẫn lần đầu chỉ tự xuất hiện một lần; mục 11 luôn có thể dùng lại để kiểm tra/cài bổ sung. Không tự tạo keystore, không tự đăng nhập GitHub/Google và không tự thay đổi secrets.
 
 **Thứ tự bắt đầu khuyến nghị:**
 1. Nếu đã có release keystore từ dự án trước, hãy giữ nguyên và không tạo key mới.
