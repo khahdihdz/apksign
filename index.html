@@ -58,7 +58,15 @@ apksign</code></pre>
 
 <section id="first-run">
 <h2>Thiết lập lần đầu</h2>
-<p>Khi mở <code>apksign</code> lần đầu, trình hướng dẫn sẽ kiểm tra môi trường Termux và hỏi trước khi cài các gói còn thiếu. Công cụ không tự tạo keystore hoặc tự thay đổi GitHub/Google account.</p>
+<p>Khi mở <code>apksign</code> lần đầu, bạn được chọn cách chuẩn bị môi trường. Chương trình không cài gói nếu chưa có lựa chọn xác nhận và không tự tạo keystore hoặc thay đổi tài khoản GitHub/Google.</p>
+<div class="card">
+<h3>Chọn cách cài đặt</h3>
+<ol class="steps">
+<li><strong>1 · Cài tất cả:</strong> OpenJDK 17, Coreutils, GitHub CLI, rclone, OpenSSL và tar.</li>
+<li><strong>2 · Chọn nhóm:</strong> cài nhóm keystore; sau đó tùy chọn nhóm GitHub CLI và Google Drive.</li>
+<li><strong>3 · Bỏ qua:</strong> vào menu chính và có thể chạy mục 11 để cài bổ sung sau.</li>
+</ol>
+</div>
 <div class="grid">
 <div class="card"><h3>⚙️ Thành phần cơ bản</h3><p class="muted">OpenJDK 17 và Coreutils để tạo, đọc và xuất release keystore.</p></div>
 <div class="card"><h3>🐙 GitHub CLI</h3><p class="muted"><code>gh</code> là tùy chọn, dùng cho mục 9 đồng bộ bốn GitHub Actions Secrets.</p></div>
