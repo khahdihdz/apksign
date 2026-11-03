@@ -8,7 +8,7 @@ TMP=""
 TASK_NAME="Google Drive"
 notify(){
   local level="${1:-info}" message="${2:-}"
-  printf '[%s] [%s] %s\\n' "$(date '+%H:%M:%S')" "$level" "$message"
+  printf '[%s] [%s] %s\n' "$(date '+%H:%M:%S')" "$level" "$message"
   if command -v termux-notification >/dev/null 2>&1; then
     termux-notification --title "apksign • $TASK_NAME" --content "$message" --id 101 --priority high >/dev/null 2>&1 || true
   fi
