@@ -257,24 +257,48 @@ install_missing() {
 
 first_run_setup() {
   local marker="$KEYSTORE_DIR/.first-run-complete"
+  local choice
   [[ -f "$marker" ]] && return 0
   header
   echo "CHÀO MỪNG BẠN ĐẾN VỚI APKSIGN"
-  echo "Lần đầu sử dụng, công cụ sẽ kiểm tra các gói cần thiết."
-  echo "Không tạo hoặc thay đổi keystore nếu bạn chưa chọn chức năng tương ứng."
+  echo "Bạn có muốn kiểm tra và cài đặt các gói cần thiết không?"
+  echo
+  echo "1. Cài tất cả gói cần thiết (JDK, GitHub CLI, Google Drive)"
+  echo "2. Chọn nhóm gói muốn cài"
+  echo "3. Bỏ qua, vào menu chính"
   echo
   if ! command -v pkg >/dev/null 2>&1; then
     echo -e "$RED Không tìm thấy pkg. apksign chỉ hỗ trợ môi trường Termux.$NC"
     pause
     return 1
   fi
-  install_missing "quản lý keystore" openjdk-17 coreutils
-  echo
-  install_missing "GitHub Secrets (mục 9)" gh
-  echo
-  install_missing "Google Drive Backup (mục 10)" rclone openssl tar
-  echo
+  read -r -p "Lựa chọn [1-3]: " choice
+  case "$choice" in
+    1)
+      pkg update -y || { echo -e "$RED Không thể cập nhật danh sách gói.$NC"; pause; return 1; }
+      install_missing "quản lý keystore" openjdk-17 coreutils
+      install_missing "GitHub Secrets (mục 9)" gh
+      install_missing "Google Drive Backup (mục 10)" rclone openssl tar
+      ;;
+    2)
+      echo
+      install_missing "quản lý keystore" openjdk-17 coreutils
+      echo
+      read -r -p "Cài GitHub CLI (gh) cho mục 9? [y/N]: " answer
+      [[ "${answer:-N}" =~ ^[Yy]$ ]] && install_missing "GitHub Secrets (mục 9)" gh
+      echo
+      read -r -p "Cài rclone/openssl/tar cho mục 10? [y/N]: " answer
+      [[ "${answer:-N}" =~ ^[Yy]$ ]] && install_missing "Google Drive Backup (mục 10)" rclone openssl tar
+      ;;
+    3)
+      echo "Đã bỏ qua cài đặt. Có thể dùng mục 11 để cài bổ sung sau."
+      ;;
+    *)
+      echo "Lựa chọn không hợp lệ; bỏ qua thiết lập gói lần này."
+      ;;
+  esac
   if ! command -v termux-notification >/dev/null 2>&1; then
+    echo
     echo "Termux:API là tùy chọn để nhận thông báo Android."
     echo "Cài ứng dụng Termux:API cùng nguồn với Termux, sau đó chạy: pkg install termux-api"
   else
@@ -284,10 +308,9 @@ first_run_setup() {
   : > "$marker"
   chmod 600 "$marker"
   echo
-  echo "Thiết lập lần đầu đã hoàn tất."
-  echo "Bắt đầu an toàn: nếu đã có keystore từ trước, KHÔNG tạo keystore mới."
-  echo "Nếu chưa có, chọn mục 2 để tạo; chọn mục 9 để xác minh signing và GitHub Secrets."
-  echo "Chỉ dùng mục 10 sau khi mục 9 xác minh thành công và đã cấu hình rclone."
+  echo "Thiết lập lần đầu hoàn tất."
+  echo "Không có keystore nào được tạo hoặc thay đổi tự động."
+  echo "Nếu đã có keystore, hãy tiếp tục sử dụng key cũ."
   pause
 }
 
