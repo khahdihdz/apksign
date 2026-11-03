@@ -3,57 +3,111 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>apksign — Android Signing Manager</title>
-<meta name="description" content="apksign — công cụ quản lý Android release keystore trên Termux của khahdihdz.">
+<meta name="theme-color" content="#080b12">
+<title>apksign — Android Signing & Drive Backup</title>
+<meta name="description" content="apksign quản lý Android release keystore trên Termux, đồng bộ GitHub Actions Secrets và sao lưu/khôi phục signing đã mã hóa trên Google Drive.">
 <style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#080b12;color:#eef2ff;line-height:1.6}a{color:#8ab4ff}.wrap{max-width:1050px;margin:auto;padding:28px 20px}.hero{padding:80px 0 55px}.badge{display:inline-block;padding:6px 12px;border:1px solid #293247;border-radius:999px;color:#aebbd4;font-size:14px}.hero h1{font-size:clamp(44px,8vw,76px);line-height:1;margin:18px 0}.hero p{max-width:700px;font-size:19px;color:#aeb8cc}.buttons{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}.btn{display:inline-block;padding:12px 18px;border-radius:12px;text-decoration:none;font-weight:700;background:#fff;color:#090c13}.btn.alt{background:#171d2b;color:#eef2ff;border:1px solid #30394d}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:25px 0 70px}.card{padding:22px;border:1px solid #20283a;background:#0e131e;border-radius:18px}.card h3{margin-top:0}.muted{color:#98a5bb}pre{overflow:auto;background:#06080d;padding:18px;border-radius:14px;border:1px solid #20283a}section{margin:65px 0}footer{border-top:1px solid #20283a;padding:30px 0;color:#8996aa}code{color:#cbd7ff}</style>
+:root{color-scheme:dark;--bg:#080b12;--panel:#101725;--line:#263247;--text:#eef2ff;--muted:#aab6ca;--accent:#8ab4ff;--green:#75dfb0}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:radial-gradient(ellipse at 70% 0%,#14223a 0,transparent 45%),var(--bg);color:var(--text);line-height:1.65}a{color:var(--accent)}.wrap{max-width:1080px;margin:auto;padding:26px 20px}.hero{padding:76px 0 54px}.badge{display:inline-block;padding:6px 12px;border:1px solid #34435d;border-radius:999px;color:#c5d4ed;font-size:13px;letter-spacing:.04em}.hero h1{font-size:clamp(46px,9vw,82px);line-height:1;margin:20px 0 14px;letter-spacing:-.06em}.hero p{max-width:760px;font-size:clamp(17px,2.5vw,20px);color:var(--muted)}.buttons{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}.btn{display:inline-block;padding:12px 18px;border-radius:12px;text-decoration:none;font-weight:750;background:#eaf1ff;color:#09111e}.btn.alt{background:#182235;color:var(--text);border:1px solid #35435b}.status{display:inline-flex;gap:8px;align-items:center;color:var(--green);font-size:14px;margin-top:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:15px;margin:24px 0 52px}.card{padding:21px;border:1px solid var(--line);background:linear-gradient(145deg,#111a2a,#0d131e);border-radius:17px}.card h3{margin:0 0 8px;font-size:18px}.muted{color:var(--muted)}section{margin:58px 0}h2{font-size:clamp(25px,4vw,34px);letter-spacing:-.025em}h3{font-size:19px}pre{overflow:auto;background:#05080e;padding:17px;border-radius:13px;border:1px solid var(--line);color:#dbe6ff}code{color:#d4e0ff}.steps{padding-left:22px}.steps li{margin:9px 0}.callout{border-left:3px solid var(--green);padding:12px 16px;background:#0e1b1b;border-radius:0 10px 10px 0;color:#d7eee5}.warning{border-left-color:#e7bb69;background:#211b10;color:#f3e6c9}.pill{display:inline-block;border:1px solid var(--line);border-radius:8px;padding:3px 8px;color:#c8d5ea;font-size:13px}footer{border-top:1px solid var(--line);padding:28px 0;color:#8996aa;margin-top:65px}.toplink{float:right;text-decoration:none}@media(max-width:600px){.hero{padding-top:52px}.wrap{padding:20px 16px}.btn{width:100%;text-align:center}.toplink{float:none;display:block;margin-top:8px}}
+</style>
 </head>
 <body>
 <div class="wrap">
-<header class="hero">
-<span class="badge">TERMUX • ANDROID • OPEN SOURCE</span>
+<header class="hero" id="top">
+<span class="badge">TERMUX · ANDROID · OPEN SOURCE · MIT</span>
 <h1>apksign</h1>
-<p>Công cụ quản lý chữ ký Android release trên Termux. Tạo keystore RSA-4096, xem certificate, xuất Base64 cho GitHub Actions, kiểm tra APK và sao lưu signing key.</p>
+<p>Quản lý Android release keystore ngay trên Termux. Đồng bộ 4 GitHub Actions Secrets và bảo vệ bộ signing bằng bản sao lưu Google Drive được mã hóa.</p>
 <div class="buttons">
-<a class="btn" href="https://github.com/khahdihdz/apksign/archive/refs/heads/main.zip">⬇ Tải ZIP</a>
+<a class="btn" href="https://raw.githubusercontent.com/khahdihdz/apksign/main/install.sh">Cài đặt bằng script</a>
 <a class="btn alt" href="https://github.com/khahdihdz/apksign">GitHub Repository</a>
 <a class="btn alt" href="https://github.com/khahdihdz/apksign/releases">Releases</a>
+<a class="btn alt" href="https://github.com/khahdihdz/apksign/archive/refs/heads/main.zip">Tải ZIP</a>
 </div>
+<div class="status">● Có hỗ trợ backup và restore Google Drive</div>
 </header>
-<section>
-<h2>Tính năng</h2>
+
+<section id="features">
+<h2>Tính năng chính</h2>
 <div class="grid">
-<div class="card"><h3>🔐 RSA-4096</h3><p class="muted">Tạo Android release keystore dùng cho quá trình phát hành ứng dụng.</p></div>
-<div class="card"><h3>🧾 SHA-256</h3><p class="muted">Xem certificate và fingerprint để kiểm tra signing identity.</p></div>
-<div class="card"><h3>📦 GitHub Actions</h3><p class="muted">Xuất keystore Base64 và dùng bộ Secret chuẩn hóa.</p></div>
-<div class="card"><h3>✅ Verify APK</h3><p class="muted">Kiểm tra chữ ký APK bằng Android <code>apksigner</code>.</p></div>
-<div class="card"><h3>💾 Backup</h3><p class="muted">Tạo bản sao lưu keystore để tránh mất signing key.</p></div>
-<div class="card"><h3>🛡️ An toàn</h3><p class="muted">Không ghi đè keystore đang tồn tại và không đưa private key vào repo.</p></div>
+<div class="card"><h3>🔐 RSA-4096 keystore</h3><p class="muted">Tạo và quản lý release keystore, alias, mật khẩu và certificate.</p></div>
+<div class="card"><h3>🧾 Certificate SHA-256</h3><p class="muted">Xem fingerprint và xác minh danh tính signing key.</p></div>
+<div class="card"><h3>📦 GitHub Actions</h3><p class="muted">Xuất Base64, xác minh và đồng bộ bộ 4 Android signing secrets.</p></div>
+<div class="card"><h3>✅ APK signing</h3><p class="muted">Ký APK bất kỳ và kiểm tra chữ ký bằng Android apksigner.</p></div>
+<div class="card"><h3>☁️ Google Drive Backup</h3><p class="muted">Mã hóa keystore, Base64 và 4 secrets thành archive trước khi tải lên Drive.</p></div>
+<div class="card"><h3>♻️ Restore an toàn</h3><p class="muted">Tải archive, giải mã, khôi phục keystore và lưu secrets riêng; không tự ghi đè GitHub Secrets.</p></div>
 </div>
 </section>
-<section>
-<h2>Cài đặt nhanh</h2>
-<pre><code>pkg update -y
-pkg install git -y
-git clone https://github.com/khahdihdz/apksign.git
-cd apksign
-chmod +x apksign
-./apksign</code></pre>
+
+<section id="install">
+<h2>Cài đặt nhanh trên Termux</h2>
+<p class="muted">Mở Termux và chạy lệnh sau để cài đặt hoặc cập nhật:</p>
+<pre><code>curl -fsSL https://raw.githubusercontent.com/khahdihdz/apksign/main/install.sh | sh
+apksign</code></pre>
+<p class="muted">Cập nhật về phiên bản mới nhất:</p>
+<pre><code>apksign --update</code></pre>
+<p class="callout">Dữ liệu signing được giữ trong <code>~/.apksign/</code> khi cập nhật công cụ.</p>
 </section>
-<section>
-<h2>GitHub Secrets</h2>
-<p class="muted">Bộ Secret chuẩn dùng cho Android repositories:</p>
+
+<section id="menu">
+<h2>Menu công cụ</h2>
+<div class="grid">
+<div class="card"><h3>1–8 · Quản lý signing</h3><p class="muted">Cài công cụ, tạo keystore, ký/verify APK, xem certificate, xuất Base64 và backup cục bộ.</p></div>
+<div class="card"><h3>9 · GitHub Secrets</h3><p class="muted">Xác minh bộ keystore/password/alias và đồng bộ 4 secrets chuẩn.</p></div>
+<div class="card"><h3>10 · Google Drive</h3><p class="muted">Chọn 1 để backup bộ signing đã xác minh hoặc 2 để khôi phục từ Drive.</p></div>
+</div>
+</section>
+
+<section id="drive">
+<h2>Thiết lập Google Drive Backup</h2>
+<p>Chỉ cần cấu hình rclone một lần trên thiết bị. Cài các gói cần thiết:</p>
+<pre><code>pkg update -y
+pkg install rclone openssl tar -y
+rclone config</code></pre>
+<ol class="steps">
+<li>Tạo remote tên <code>gdrive</code>, chọn backend Google Drive.</li>
+<li>Nếu dùng OAuth Client riêng, tạo OAuth Client ID loại <strong>Desktop app</strong> trong Google Cloud Console và bật Google Drive API.</li>
+<li>Chọn scope <code>drive</code>; để trống <code>service_account_file</code>; chọn <code>n</code> cho Advanced config và Shared Drive nếu dùng My Drive.</li>
+<li>Chọn <code>y</code> để xác thực qua trình duyệt, đăng nhập Google và cấp quyền.</li>
+<li>Kiểm tra remote bằng <code>rclone lsd gdrive:</code>.</li>
+<li>Chạy <code>apksign</code> → mục <strong>9</strong> để xác minh và lưu bộ signing. Sau đó chọn mục <strong>10 → 1</strong> để backup.</li>
+</ol>
+<p class="callout">Bản backup được tải lên <code>gdrive:apksign-backups/</code> với tên dạng <code>apksign-backup-YYYYMMDD-HHMMSS.tar.gz.enc</code>.</p>
+<p class="callout warning">Archive dùng AES-256-CBC + PBKDF2 (300.000 vòng, SHA-256). Mật khẩu giải mã là signing store password. Hãy giữ mật khẩu và một bản backup ngoại tuyến an toàn.</p>
+</section>
+
+<section id="restore">
+<h2>Khôi phục bản backup</h2>
+<ol class="steps">
+<li>Mở <code>apksign</code> → mục <strong>10</strong> → chọn <strong>2. Khôi phục</strong>.</li>
+<li>Chọn tên archive trên Google Drive và nhập signing store password đã dùng để mã hóa.</li>
+<li>Công cụ tải xuống, giải mã và kiểm tra archive trước khi khôi phục.</li>
+<li>Keystore/Base64 được khôi phục vào <code>~/.apksign/</code>. Nếu keystore hiện tại tồn tại, công cụ tạo bản sao dự phòng trước khi thay thế.</li>
+</ol>
+<p class="callout warning">Restore không tự cập nhật GitHub Secrets. File secrets khôi phục được lưu tại <code>~/.apksign/backup-secrets.env</code>; không chia sẻ hoặc commit file này.</p>
+</section>
+
+<section id="secrets">
+<h2>Bộ GitHub Actions Secrets</h2>
+<p class="muted">Bốn tên secret được dùng thống nhất giữa các Android repository:</p>
 <pre><code>ANDROID_SIGNING_KEYSTORE_BASE64
 ANDROID_SIGNING_STORE_PASSWORD
 ANDROID_SIGNING_KEY_ALIAS
 ANDROID_SIGNING_KEY_PASSWORD</code></pre>
+<p class="muted">Workflow đồng bộ trung tâm có thể phát hiện Android repository và đồng bộ secrets theo cấu hình của repository apksign.</p>
 </section>
-<section>
-<h2>Giữ an toàn signing key</h2>
-<p class="muted">Không commit file <code>.jks</code>, Base64 keystore hoặc mật khẩu vào repository public. Để cập nhật ứng dụng Android, hãy giữ nguyên application ID và release signing key của ứng dụng đã phát hành.</p>
+
+<section id="security">
+<h2>Bảo mật signing key</h2>
+<ul class="steps">
+<li>Không commit keystore, Base64, mật khẩu, credentials hoặc archive backup lên repository.</li>
+<li>Không tạo keystore mới cho ứng dụng đã phát hành; giữ nguyên Application ID và release signing key.</li>
+<li>Bảo vệ thư mục <code>~/.apksign/credentials/</code> và mật khẩu signing.</li>
+<li>Giữ ít nhất một bản sao lưu ngoại tuyến ở nơi an toàn.</li>
+</ul>
 </section>
+
 <footer>
-<strong>apksign</strong> · MIT License · Được phát triển bởi <a href="https://khahdihdz.github.io/">khahdihdz.github.io</a>
+<strong>apksign</strong> · MIT License · Phát triển bởi <a href="https://github.com/khahdihdz">khahdihdz</a>
+<a class="toplink" href="#top">Lên đầu trang ↑</a>
 </footer>
 </div>
 </body>
