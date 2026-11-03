@@ -22,17 +22,22 @@ Cài **Termux** và có kết nối Internet.
 
 Script có thể tự cài OpenJDK 17 và Coreutils. Nếu muốn kiểm tra APK bằng `apksigner`, cần Android SDK Build Tools và đưa `apksigner` vào `PATH`.
 
-## 🚀 Cài đặt
+## 🚀 Cài đặt nhanh trên Termux
 
-```bash
-pkg update -y
-pkg install git -y
+Chạy một lệnh để cài đặt hoặc cập nhật:
 
-git clone https://github.com/khahdihdz/apksign.git
-cd apksign
-chmod +x apksign
-./apksign
+```sh
+curl -fsSL https://raw.githubusercontent.com/khahdihdz/apksign/main/install.sh | sh
 ```
+
+Sau đó mở menu ở bất kỳ thư mục nào bằng:
+
+```sh
+apksign
+```
+
+Không cần `cd ~/apksign`, `chmod` hoặc tự chạy `bash apksign`. Installer tạo lệnh trong Termux PATH và stash thay đổi cục bộ trước khi cập nhật repository.
+
 
 ## 🧭 Menu
 
