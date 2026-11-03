@@ -10,54 +10,41 @@ trap cleanup EXIT
 pause(){ read -r -p "Nhấn Enter để tiếp tục..."; }
 need(){ command -v "$1" >/dev/null 2>&1 || { echo "Thiếu $1"; return 1; }; }
 header(){ clear 2>/dev/null || true; echo "================================"; echo "       apksign Drive Backup"; echo "================================"; }
-setup(){
-  pkg update -y
-  pkg install -y rclone openssl tar
-  echo
-  echo "Cấu hình Google Drive bằng rclone. Chọn New remote, đặt tên: gdrive"
-  echo "Storage: Google Drive. Làm theo hướng dẫn đăng nhập OAuth."
-  rclone config
-  rclone lsd gdrive:
-}
 backup(){
   need rclone; need openssl; need tar
   [[ -s "$KEYSTORE" ]] || { echo "Không tìm thấy keystore: $KEYSTORE"; return 1; }
+  local CRED="$ROOT/credentials"
+  [[ -s "$CRED/store-password" && -s "$CRED/key-password" && -s "$CRED/key-alias" ]] || {
+    echo "Chưa có bộ signing đã xác minh. Hãy chạy mục 9 trước."
+    return 1
+  }
+  rclone lsd gdrive: >/dev/null || {
+    echo "Không truy cập được Google Drive remote gdrive."
+    echo "Cấu hình/đăng nhập một lần bằng: rclone config"
+    return 1
+  }
   mkdir -p "$ROOT"; chmod 700 "$ROOT"
   base64 "$KEYSTORE" | tr -d '\n' > "$B64"; chmod 600 "$B64"
   TMP="$(mktemp -d "$ROOT/drive-backup.XXXXXX")"; chmod 700 "$TMP"
   cp "$KEYSTORE" "$TMP/khahdihdz-release.jks"
   cp "$B64" "$TMP/keystore.base64"
-  cat > "$TMP/github-secrets.env" <<'EOF'
-ANDROID_SIGNING_KEYSTORE_BASE64=
-ANDROID_SIGNING_STORE_PASSWORD=
-ANDROID_SIGNING_KEY_ALIAS=khahdihdz-release
-ANDROID_SIGNING_KEY_PASSWORD=
-EOF
-  echo "Nhập giá trị secrets hiện tại (GitHub không cho đọc ngược secrets đã lưu)."
-  read -r -s -p "ANDROID_SIGNING_STORE_PASSWORD: " SP; echo
-  read -r -s -p "ANDROID_SIGNING_KEY_PASSWORD: " KP; echo
-  [[ -n "$SP" && -n "$KP" ]] || { unset SP KP; echo "Mật khẩu không được để trống."; return 1; }
   {
     printf 'ANDROID_SIGNING_KEYSTORE_BASE64=%s\n' "$(cat "$B64")"
-    printf 'ANDROID_SIGNING_STORE_PASSWORD=%s\n' "$SP"
-    printf 'ANDROID_SIGNING_KEY_ALIAS=khahdihdz-release\n'
-    printf 'ANDROID_SIGNING_KEY_PASSWORD=%s\n' "$KP"
+    printf 'ANDROID_SIGNING_STORE_PASSWORD=%s\n' "$(cat "$CRED/store-password")"
+    printf 'ANDROID_SIGNING_KEY_ALIAS=%s\n' "$(cat "$CRED/key-alias")"
+    printf 'ANDROID_SIGNING_KEY_PASSWORD=%s\n' "$(cat "$CRED/key-password")"
   } > "$TMP/github-secrets.env"
-  unset SP KP
   chmod 600 "$TMP/"*
-  read -r -s -p "Mật khẩu mã hóa bản backup (ít nhất 12 ký tự): " PASS; echo
-  [[ ${#PASS} -ge 12 ]] || { unset PASS; echo "Mật khẩu quá ngắn."; return 1; }
   ARCHIVE="$ROOT/apksign-backup-$(date '+%Y%m%d-%H%M%S').tar.gz.enc"
-  export APKSIGN_BACKUP_PASSWORD="$PASS"
-  tar -czf - -C "$TMP" . | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 300000 -md sha256 -pass env:APKSIGN_BACKUP_PASSWORD -out "$ARCHIVE"
-  unset APKSIGN_BACKUP_PASSWORD
-  unset PASS
+  echo "Đang mã hóa đúng keystore + 4 secrets đã xác minh ở mục 9..."
+  tar -czf - -C "$TMP" . | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 300000 -md sha256 -pass "file:$CRED/store-password" -out "$ARCHIVE"
   chmod 600 "$ARCHIVE"
-  echo "Đang tải bản backup đã mã hóa lên Google Drive..."
+  echo "Đang đồng bộ bản backup đã mã hóa lên Google Drive..."
   rclone mkdir "$REMOTE"
   rclone copyto "$ARCHIVE" "$REMOTE/$(basename "$ARCHIVE")" --progress
-  echo "Backup hoàn tất: $REMOTE/$(basename "$ARCHIVE")"
-  echo "Tệp được mã hóa AES-256-CBC + PBKDF2 trước khi tải lên."
+  echo "Đồng bộ hoàn tất: $REMOTE/$(basename "$ARCHIVE")"
+  echo "Đã sao lưu keystore, Base64 và chính xác 4 secrets từ mục 9."
+  echo "Mật khẩu mã hóa archive là signing store password."
 }
 restore(){
   need rclone; need openssl; need tar
@@ -67,10 +54,9 @@ restore(){
   [[ "$NAME" =~ ^apksign-backup-[0-9-]+\.tar\.gz\.enc$ ]] || { echo "Tên file không hợp lệ."; return 1; }
   TMP="$(mktemp -d "$ROOT/restore.XXXXXX")"; chmod 700 "$TMP"
   rclone copyto "$REMOTE/$NAME" "$TMP/backup.enc"
-  read -r -s -p "Mật khẩu giải mã: " PASS; echo
-  export APKSIGN_BACKUP_PASSWORD="$PASS"
-  if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 300000 -md sha256 -pass env:APKSIGN_BACKUP_PASSWORD -in "$TMP/backup.enc" | tar -xz -C "$TMP"; then
-    unset PASS; echo "Giải mã thất bại. Kiểm tra mật khẩu hoặc file."; return 1
+  read -r -s -p "Signing store password để giải mã: " PASS; echo
+  if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 300000 -md sha256 -pass "pass:$PASS" -in "$TMP/backup.enc" | tar -xz -C "$TMP"; then
+    unset PASS; echo "Giải mã thất bại. Kiểm tra signing store password hoặc file."; return 1
   fi
   unset PASS
   [[ -s "$TMP/khahdihdz-release.jks" ]] || { echo "Backup không có keystore hợp lệ."; return 1; }
@@ -84,15 +70,16 @@ restore(){
   echo "Không tự động ghi secrets lên GitHub để tránh ghi đè nhầm."
 }
 header
-echo "1. Cấu hình / kiểm tra Google Drive (rclone)"
-echo "2. Sao lưu keystore + 4 GitHub Secrets (mã hóa)"
-echo "3. Khôi phục keystore từ Drive"
+echo "Đồng bộ một chiều: mục 9 → mục 10"
+echo "Mục 10 tự lấy đúng keystore + 4 secrets đã xác minh ở mục 9."
+echo
+echo "1. Đồng bộ bộ signing hiện tại lên Google Drive"
+echo "2. Khôi phục bản backup từ Google Drive"
 echo "0. Thoát"
 read -r -p "Chọn: " choice
 case "$choice" in
-  1) setup ;;
-  2) backup ;;
-  3) restore ;;
+  1) backup ;;
+  2) restore ;;
   0) exit 0 ;;
   *) echo "Lựa chọn không hợp lệ." ;;
 esac
