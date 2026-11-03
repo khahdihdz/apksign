@@ -227,6 +227,14 @@ Menu **9 → 10** là luồng đồng bộ một chiều:
 
 Cấu hình remote Google Drive tên `gdrive` một lần bằng `rclone config` (cần cài `rclone`, `openssl`, `tar`). Mục 10 không còn lựa chọn cài đặt/cấu hình; nó kiểm tra remote rồi đồng bộ trực tiếp.
 
+### Thông báo tác vụ mục 10
+
+- Hiển thị trạng thái theo từng giai đoạn: kiểm tra kết nối, chuẩn bị dữ liệu, mã hóa, tải lên, tải xuống, giải mã và khôi phục.
+- Có thông báo riêng khi tác vụ thành công hoặc thất bại; lỗi có mã và vị trí dòng để dễ kiểm tra.
+- Nếu muốn nhận thông báo Android bên ngoài màn hình Termux, cài thêm **Termux:API** từ cùng nguồn với ứng dụng Termux và chạy `pkg install termux-api`. Nếu chưa cài, trạng thái vẫn hiển thị trong terminal.
+- Thông báo không chứa mật khẩu, Base64 hay nội dung secrets.
+
+
 **Bảo mật:** GitHub không cho đọc ngược Actions Secrets; mục 9 là nguồn dữ liệu chuẩn. Mật khẩu signing được lưu cục bộ dạng tệp riêng tư (quyền 600) để mục 10 dùng lại. Signing store password cũng được dùng để mã hóa archive. Bảo vệ thiết bị và thư mục `~/.apksign/credentials/`.
 
 
