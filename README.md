@@ -228,3 +228,21 @@ Menu **9 → 10** là luồng đồng bộ một chiều:
 Cấu hình remote Google Drive tên `gdrive` một lần bằng `rclone config` (cần cài `rclone`, `openssl`, `tar`). Mục 10 không còn lựa chọn cài đặt/cấu hình; nó kiểm tra remote rồi đồng bộ trực tiếp.
 
 **Bảo mật:** GitHub không cho đọc ngược Actions Secrets; mục 9 là nguồn dữ liệu chuẩn. Mật khẩu signing được lưu cục bộ dạng tệp riêng tư (quyền 600) để mục 10 dùng lại. Signing store password cũng được dùng để mã hóa archive. Bảo vệ thiết bị và thư mục `~/.apksign/credentials/`.
+
+
+## ⬆️ Cập nhật bằng lệnh
+
+Sau khi đã cài đặt, có thể cập nhật lên phiên bản mới nhất trực tiếp từ bất kỳ thư mục nào:
+
+```sh
+apksign --update
+```
+
+Lệnh này gọi installer của dự án, tải thay đổi mới nhất từ GitHub và cập nhật lệnh trong Termux PATH. Keystore tại `~/.apksign/` không bị xóa hoặc thay thế.
+
+Các lệnh khác:
+
+```sh
+apksign          # Mở menu
+apksign --help   # Xem trợ giúp
+```
