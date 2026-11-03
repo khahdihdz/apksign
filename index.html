@@ -56,6 +56,25 @@ apksign</code></pre>
 </div>
 </section>
 
+<section id="first-run">
+<h2>Thiết lập lần đầu</h2>
+<p>Khi mở <code>apksign</code> lần đầu, trình hướng dẫn sẽ kiểm tra môi trường Termux và hỏi trước khi cài các gói còn thiếu. Công cụ không tự tạo keystore hoặc tự thay đổi GitHub/Google account.</p>
+<div class="grid">
+<div class="card"><h3>⚙️ Thành phần cơ bản</h3><p class="muted">OpenJDK 17 và Coreutils để tạo, đọc và xuất release keystore.</p></div>
+<div class="card"><h3>🐙 GitHub CLI</h3><p class="muted"><code>gh</code> là tùy chọn, dùng cho mục 9 đồng bộ bốn GitHub Actions Secrets.</p></div>
+<div class="card"><h3>☁️ Google Drive</h3><p class="muted"><code>rclone</code>, <code>openssl</code> và <code>tar</code> phục vụ backup/restore ở mục 10.</p></div>
+</div>
+<p class="muted">Bạn có thể chọn không cài một nhóm gói và bổ sung sau bằng mục <strong>11 · Kiểm tra / cài đặt gói cần thiết</strong>. Termux:API là tùy chọn riêng để nhận thông báo Android.</p>
+<h3>Trình tự khởi tạo đề xuất</h3>
+<ol class="steps">
+<li>Nếu đang có keystore dùng để phát hành ứng dụng, tiếp tục sử dụng key đó; không tạo key mới.</li>
+<li>Nếu chưa có keystore, chọn mục <strong>2</strong> để tạo release key.</li>
+<li>Chọn mục <strong>9</strong> để xác minh keystore và đồng bộ bốn GitHub Secrets.</li>
+<li>Cấu hình rclone remote <code>gdrive</code>, sau đó dùng mục <strong>10 → 1</strong> để sao lưu.</li>
+</ol>
+<p class="callout warning">Không gửi keystore, mật khẩu, GitHub token hoặc OAuth Client Secret cho người khác. Mọi thao tác cài đặt gói đều hỏi xác nhận trước.</p>
+</section>
+
 <section id="drive">
 <h2>Thiết lập Google Drive Backup</h2>
 <p>Chỉ cần cấu hình rclone một lần trên thiết bị. Cài các gói cần thiết:</p>
