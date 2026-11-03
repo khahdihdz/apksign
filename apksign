@@ -238,7 +238,7 @@ install_missing() {
   local label="$1"; shift
   local missing=() package
   for package in "$@"; do
-    if ! command -v "$package" >/dev/null 2>&1; then
+    if ! dpkg -s "$package" >/dev/null 2>&1; then
       missing+=("$package")
     fi
   done
@@ -324,7 +324,7 @@ while true; do
     8) backup_keystore ;;
     9) sync_github_secrets ;;
     10) "$HOME/apksign/drive-backup" ;;
-    11) install_tools; first_run_setup_force=1; install_missing "quản lý keystore" openjdk-17 coreutils; install_missing "GitHub Secrets" gh; install_missing "Google Drive Backup" rclone openssl tar; pause ;;
+    11) header; pkg update -y; install_missing "quản lý keystore" openjdk-17 coreutils; install_missing "GitHub Secrets" gh; install_missing "Google Drive Backup" rclone openssl tar; echo; echo "Nếu muốn nhận thông báo Android, cài Termux:API riêng."; pause ;;
     0) clear; exit 0 ;;
     *) echo -e "$RED Lựa chọn không hợp lệ.$NC"; sleep 1 ;;
   esac
