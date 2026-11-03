@@ -1,45 +1,53 @@
 # apksign
 
-**apksign** là công cụ quản lý chữ ký ứng dụng Android chạy trực tiếp trên **Termux**.
-
-Công cụ được thiết kế để tạo và quản lý **một Android release keystore dùng chung** cho các dự án Android, đặc biệt phù hợp với hệ thống GitHub Actions của `khahdihdz`.
+**apksign** là công cụ quản lý chữ ký phát hành Android chạy trực tiếp trên **Termux**. Công cụ giúp duy trì một release keystore dùng chung cho các dự án Android, đồng bộ GitHub Actions Secrets và sao lưu bộ signing được mã hóa lên Google Drive.
 
 ## ✨ Tính năng
 
-- 🔐 Tạo Android release keystore RSA-4096
-- 🔑 Quản lý alias và mật khẩu signing key
-- 🔎 Xem thông tin certificate
-- 🧾 Xem fingerprint SHA-256
-- 📦 Xuất keystore sang Base64 để dùng với GitHub Actions
-- ✅ Kiểm tra chữ ký APK bằng `apksigner`
-- 💾 Sao lưu keystore
-- 🛡️ Không ghi đè keystore đang tồn tại
-- ⚙️ Chuẩn hóa 4 GitHub Secrets dùng chung cho các Android repository
+- 🔐 Tạo Android release keystore RSA-4096.
+- 🔑 Quản lý alias và mật khẩu signing key.
+- 🔎 Xem thông tin certificate và fingerprint SHA-256.
+- 📦 Xuất keystore Base64 cho GitHub Actions.
+- ✅ Kiểm tra chữ ký APK bằng `apksigner`.
+- 💾 Sao lưu keystore cục bộ.
+- 🔄 Đồng bộ và xác minh 4 GitHub Actions Secrets.
+- ☁️ Sao lưu/khôi phục bộ signing qua Google Drive bằng rclone.
+- 🔒 Mã hóa archive AES-256-CBC, PBKDF2 300.000 vòng trước khi tải lên Drive.
+- 🛡️ Không ghi đè keystore đang tồn tại khi tạo mới; không tự động ghi GitHub Secrets khi restore.
 
 ## 📱 Yêu cầu
 
-Cài **Termux** và có kết nối Internet.
+- Android có cài **Termux** và kết nối Internet.
+- OpenJDK 17/Coreutils (có thể cài từ menu).
+- GitHub CLI (`gh`) và đăng nhập GitHub nếu sử dụng mục 9.
+- `rclone`, `openssl`, `tar` nếu sử dụng Google Drive Backup.
+- Termux:API là tùy chọn nếu muốn nhận thông báo Android ngoài terminal.
 
-Script có thể tự cài OpenJDK 17 và Coreutils. Nếu muốn kiểm tra APK bằng `apksigner`, cần Android SDK Build Tools và đưa `apksigner` vào `PATH`.
+Cài Termux và Termux:API từ cùng một nguồn phát hành để tránh lỗi tương thích plugin.
 
 ## 🚀 Cài đặt nhanh trên Termux
 
-Chạy một lệnh để cài đặt hoặc cập nhật:
+Cài đặt hoặc cập nhật bằng một lệnh:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/khahdihdz/apksign/main/install.sh | sh
 ```
 
-Sau đó mở menu ở bất kỳ thư mục nào bằng:
+Mở menu từ bất kỳ thư mục nào:
 
 ```sh
 apksign
 ```
 
-Không cần `cd ~/apksign`, `chmod` hoặc tự chạy `bash apksign`. Installer tạo lệnh trong Termux PATH và stash thay đổi cục bộ trước khi cập nhật repository.
+Cập nhật:
 
+```sh
+apksign --update
+```
 
-## 🧭 Menu
+Installer tạo lệnh trong Termux PATH và giữ dữ liệu signing trong `~/.apksign/` khi cập nhật.
+
+## 🧭 Menu chính
 
 ```text
 1. Cài JDK / công cụ
@@ -49,160 +57,177 @@ Không cần `cd ~/apksign`, `chmod` hoặc tự chạy `bash apksign`. Installe
 5. Xuất keystore Base64
 6. Kiểm tra APK đã ký
 7. GitHub Secrets
-8. Sao lưu keystore
+8. Sao lưu keystore cục bộ
+9. Đồng bộ 4 GitHub Secrets
+10. Đồng bộ bộ signing đã xác minh lên Google Drive
 0. Thoát
 ```
 
-### Tạo signing keystore
+### Signing keystore
 
-Keystore mặc định:
+Thông tin mặc định:
 
-```text
-RSA 4096-bit
-Alias: khahdihdz-release
-Validity: 10000 ngày
-~/.apksign/khahdihdz-release.jks
-```
+| Thuộc tính | Giá trị |
+|---|---|
+| Thuật toán | RSA 4096-bit |
+| Alias | `khahdihdz-release` |
+| Validity | 10.000 ngày |
+| Keystore | `~/.apksign/khahdihdz-release.jks` |
 
-**Không xóa hoặc tạo lại keystore nếu đang dùng để phát hành ứng dụng.**
+**Quan trọng:** Không tạo keystore mới cho ứng dụng đã phát hành. Các bản cập nhật Android phải giữ nguyên Application ID và release signing key cũ.
 
-### Xuất Base64
+### GitHub Actions Secrets
 
-Tạo file:
-
-```text
-~/.apksign/keystore.base64
-```
-
-Nội dung file dùng cho GitHub Secret `ANDROID_SIGNING_KEYSTORE_BASE64`.
-
-### Kiểm tra APK
-
-```bash
-apksigner verify --verbose --print-certs app-release.apk
-```
-
-### Sao lưu
-
-Bản sao được tạo tại:
-
-```text
-~/android-signing-backups/
-```
-
-Nên giữ ít nhất **2 bản sao lưu ở những nơi an toàn khác nhau**.
-
-## 🔐 GitHub Actions
-
-Trong mỗi Android repository, tạo 4 Repository Secrets:
+Mục 9 xác minh keystore/password/alias rồi đồng bộ 4 secrets:
 
 | Secret | Giá trị |
 |---|---|
-| `ANDROID_SIGNING_KEYSTORE_BASE64` | Nội dung `keystore.base64` |
-| `ANDROID_SIGNING_STORE_PASSWORD` | Mật khẩu keystore |
-| `ANDROID_SIGNING_KEY_ALIAS` | `khahdihdz-release` |
-| `ANDROID_SIGNING_KEY_PASSWORD` | Mật khẩu signing key |
+| `ANDROID_SIGNING_KEYSTORE_BASE64` | Nội dung `~/.apksign/keystore.base64` |
+| `ANDROID_SIGNING_STORE_PASSWORD` | Signing store password |
+| `ANDROID_SIGNING_KEY_ALIAS` | Alias của key |
+| `ANDROID_SIGNING_KEY_PASSWORD` | Signing key password |
 
-### ⚠️ Bảo mật
+Mục 9 là nguồn chuẩn để xác minh bộ signing cục bộ. GitHub không cho đọc ngược giá trị Actions Secrets.
 
-**Không commit private keystore hoặc Base64 của nó vào repository public.**
+## ☁️ Google Drive Backup (mục 10)
 
-Không commit:
+Mục 10 hỗ trợ **sao lưu lên Drive** và **khôi phục từ Drive**. Đây là luồng đồng bộ một chiều; restore không tự cập nhật GitHub Secrets.
 
-```text
-*.jks
-*.keystore
-*.p12
-*.pfx
-*.pem
-*.key
-*.base64
-keystore.properties
-release.jks
+### 1. Chuẩn bị bộ signing
+
+1. Tạo hoặc giữ nguyên keystore đang sử dụng để phát hành ứng dụng.
+2. Mở `apksign` → chọn **9. Đồng bộ 4 GitHub Secrets**.
+3. Nhập đúng store password và key password.
+4. Chờ mục 9 xác minh thành công và lưu credentials riêng tư tại `~/.apksign/credentials/`.
+
+Mục 10 cần bộ signing đã được xác minh ở mục 9. Nếu chưa chạy mục 9, backup sẽ dừng và yêu cầu thực hiện trước.
+
+### 2. Cấu hình rclone và Google Drive (chỉ làm một lần)
+
+Cài công cụ:
+
+```sh
+pkg update -y
+pkg install rclone openssl tar -y
 ```
 
-Private signing key bị lộ có thể cho phép người khác ký ứng dụng giả mạo bằng cùng certificate.
+Tạo remote:
 
-## 🔄 Cập nhật ứng dụng Android
-
-Để APK/AAB mới cập nhật được ứng dụng đã cài, phải giữ nguyên:
-
-1. **Application ID**
-2. **Release signing key**
-
-Ví dụ nếu ứng dụng đã dùng:
-
-```text
-com.example.app
+```sh
+rclone config
 ```
 
-thì các bản cập nhật phải tiếp tục dùng application ID đó và đúng private signing key cũ.
+Trong trình cấu hình:
 
-> **Không tạo keystore mới cho mỗi phiên bản của ứng dụng đã phát hành.**
+1. Chọn tạo remote mới, đặt tên chính xác là `gdrive`.
+2. Chọn backend **Google Drive**.
+3. Nếu dùng OAuth Client riêng, tạo OAuth Client ID loại **Desktop app** trong Google Cloud Console; bật **Google Drive API**.
+4. Nhập Client ID và Client Secret (có thể để trống để dùng thông tin mặc định của rclone, nếu phù hợp).
+5. Chọn scope `drive` để công cụ có thể tạo và quản lý thư mục/file backup.
+6. `service_account_file`: để trống, nhấn Enter. Không nhập tên file giả hoặc chuỗi dấu nháy.
+7. Advanced config: `n`.
+8. Shared Drive: chọn `n` nếu dùng My Drive thông thường.
+9. Khi được hỏi dùng trình duyệt để xác thực, chọn `y`, đăng nhập Google và cấp quyền.
+10. Lưu cấu hình.
+
+Kiểm tra kết nối:
+
+```sh
+rclone lsd gdrive:
+```
+
+Nếu rclone báo cổng xác thực `127.0.0.1:53682` đang được sử dụng, kiểm tra các phiên Termux/tmux khác và dừng phiên rclone xác thực bị treo trước khi chạy lại:
+
+```sh
+rclone config reconnect gdrive:
+```
+
+Nếu trang Google báo `redirect_uri_mismatch`, kiểm tra OAuth Client là **Desktop app** và cấu hình redirect URI theo thông báo của rclone (mặc định `http://127.0.0.1:53682/`).
+
+### 3. Sao lưu lên Google Drive
+
+1. Chạy `apksign`.
+2. Chọn **10. Đồng bộ bộ signing đã xác minh lên Google Drive**.
+3. Chọn **1. Đồng bộ bộ signing hiện tại lên Google Drive**.
+4. Chờ thông báo hoàn tất.
+
+File được tải lên thư mục:
+
+```text
+gdrive:apksign-backups/
+```
+
+Tên file có dạng:
+
+```text
+apksign-backup-YYYYMMDD-HHMMSS.tar.gz.enc
+```
+
+Archive chứa:
+- Release keystore (`.jks`).
+- Keystore Base64.
+- File chứa 4 GitHub signing secrets.
+
+Archive được mã hóa bằng **AES-256-CBC + PBKDF2 (300.000 vòng, SHA-256)**. Mật khẩu mã hóa là **signing store password** của keystore, không phải mật khẩu Google hoặc mật khẩu cấu hình rclone.
+
+### 4. Khôi phục từ Google Drive
+
+1. Đảm bảo remote `gdrive` hoạt động.
+2. Chạy `apksign` → mục **10**.
+3. Chọn **2. Khôi phục bản backup từ Google Drive**.
+4. Chọn đúng tên file backup.
+5. Nhập signing store password dùng khi tạo archive.
+6. Chờ giải mã và kiểm tra.
+
+Nếu đã có keystore tại máy, script tạo bản sao dự phòng trước khi thay thế. Keystore và Base64 được khôi phục vào `~/.apksign/`; file secrets được lưu riêng tại `~/.apksign/backup-secrets.env`. **Restore không tự ghi các secrets lên GitHub** để tránh ghi đè nhầm. Chỉ dùng file secrets khi thực sự cần và không chia sẻ nội dung file này.
+
+### Thông báo tác vụ
+
+- Hiển thị trạng thái kiểm tra kết nối, mã hóa, tải lên, tải xuống, giải mã và khôi phục.
+- Giữ kết quả tác vụ trên màn hình đến khi nhấn Enter.
+- Có thể cài `termux-api` và ứng dụng Termux:API để nhận thông báo Android; nếu không cài, trạng thái vẫn hiển thị trong terminal.
+
+## 🔐 Bảo mật
+
+Không commit hoặc chia sẻ công khai:
+- `*.jks`, `*.keystore`, `*.p12`, `*.pfx`, `*.pem`, `*.key`.
+- `*.base64`, `keystore.properties`.
+- `~/.apksign/credentials/`, `backup-secrets.env`, archive backup và mật khẩu.
+
+Thư mục credentials được giới hạn quyền truy cập trên thiết bị. Signing store password cũng là mật khẩu giải mã archive; nếu mất mật khẩu này, không thể giải mã bản backup. Nên giữ thêm một bản backup ngoại tuyến ở nơi an toàn.
+
+## 🤖 Tự động áp dụng cho Android repository
+
+Workflow trung tâm tại `.github/workflows/sync-android-signing.yml` định kỳ quét repository thuộc tài khoản `khahdihdz`, nhận diện dự án Android có Gradle Wrapper, đồng bộ 4 signing secrets và bổ sung workflow signing dùng chung khi phù hợp.
+
+Trong repository `khahdihdz/apksign`, cấu hình Actions Secrets:
+
+- `APKSIGN_SYNC_TOKEN`: GitHub token có quyền cần thiết để đọc repository và cập nhật Contents/Actions secrets ở các repository mục tiêu.
+- `ANDROID_SIGNING_KEYSTORE_BASE64`
+- `ANDROID_SIGNING_STORE_PASSWORD`
+- `ANDROID_SIGNING_KEY_ALIAS`
+- `ANDROID_SIGNING_KEY_PASSWORD`
+
+Chạy **Actions → Sync Android signing to all repositories → Run workflow** để đồng bộ thủ công; workflow cũng hỗ trợ chạy theo lịch. Cơ chế không ghi đè workflow release Android hiện có.
 
 ## 📂 Dữ liệu cục bộ
 
 ```text
 ~/.apksign/
 ├── khahdihdz-release.jks
-└── keystore.base64
+├── keystore.base64
+├── credentials/
+│   ├── store-password
+│   ├── key-password
+│   └── key-alias
+└── backup-secrets.env       (chỉ xuất hiện sau restore)
 ```
-
-Các file private key nằm ngoài repository.
-
-## 🛠️ Dự án sử dụng
-
-Bộ signing Secret này có thể dùng cho các Android project của **khahdihdz**, ví dụ:
-
-- NRSuite-Android
-- espflash
-- Các Android project mới trong tương lai
-
-Mỗi ứng dụng vẫn phải giữ **applicationId riêng**; việc dùng chung signing key là lựa chọn của hệ thống phát hành.
-
-
-## 🤖 Tự động áp dụng cho Android repository
-
-apksign hiện có cơ chế trung tâm tại `.github/workflows/sync-android-signing.yml`. Workflow định kỳ quét các repository thuộc tài khoản `khahdihdz`, nhận diện dự án có Gradle Wrapper Android, đồng bộ 4 signing secrets và thêm workflow signing dùng chung nếu repository chưa có workflow đó.
-
-Cơ chế này dùng reusable workflow theo chuẩn GitHub Actions, giúp tránh phải sao chép logic signing giữa các repository. GitHub hỗ trợ reusable workflows và truyền secrets cho workflow được gọi.
-
-### Thiết lập một lần
-
-Trong repository `khahdihdz/apksign`, tạo 5 Actions Secrets:
-
-- `APKSIGN_SYNC_TOKEN`: GitHub token có quyền đọc danh sách repository và ghi contents + Actions secrets vào các repository cần đồng bộ.
-- `ANDROID_SIGNING_KEYSTORE_BASE64`
-- `ANDROID_SIGNING_STORE_PASSWORD`
-- `ANDROID_SIGNING_KEY_ALIAS`
-- `ANDROID_SIGNING_KEY_PASSWORD`
-
-Sau đó chạy **Actions → Sync Android signing to all repositories → Run workflow** một lần. Các lần sau workflow tự chạy theo lịch và có thể chạy thủ công. GitHub CLI hỗ trợ đặt repository secret từ workflow/token bằng `gh secret set`.
-
-> Với tài khoản cá nhân, GitHub không có organization-level secret dùng chung cho toàn bộ repository. Cơ chế của apksign vì vậy đồng bộ secret vào từng Android repository; repository Android mới sẽ được nhận diện ở lần đồng bộ kế tiếp.
-
-### Lưu ý quan trọng
-
-Cơ chế tự động **không ghi đè workflow release Android hiện có**. NRSuite-Android và espflash đang có cấu hình release signing riêng nên được giữ nguyên; hệ thống chỉ bổ sung/cấu hình repository Android mới chưa có workflow signing trung tâm.
-
-### Phạm vi
-
-- Android repository hiện tại: tự đồng bộ khi chạy workflow.
-- Android repository tương lai: tự phát hiện ở lần chạy lịch tiếp theo.
-- APK release: ký bằng cùng certificate đã cấu hình.
-- Không đưa private keystore vào Git.
-- Không fallback release sang debug signing.
 
 ## 🌐 Landing Page
 
-Trang giới thiệu tính năng và tải xuống:
-
 **https://khahdihdz.github.io/apksign/**
 
-- ⬇️ Tải mã nguồn dạng ZIP
-- 🔗 Truy cập repository GitHub
-- 📦 Truy cập Releases
-- 📱 Giới thiệu tính năng và hướng dẫn cài đặt nhanh
+Trang giới thiệu, hướng dẫn cài đặt, GitHub Actions và Google Drive Backup.
 
 ## 📄 Giấy phép
 
@@ -210,47 +235,4 @@ Phát hành theo giấy phép **MIT**.
 
 ## 👤 Tác giả
 
-**khahdihdz**
-
-Website: https://khahdihdz.github.io/
-
-[Repository apksign](https://github.com/khahdihdz/apksign)
-
-
-## ☁️ Sao lưu Google Drive
-
-Menu **9 → 10** là luồng đồng bộ một chiều:
-
-1. Chọn **9**: xác minh keystore và mật khẩu, cập nhật 4 GitHub Secrets. Khi thành công, công cụ lưu chính bộ signing vừa xác minh trong `~/.apksign/credentials/` với quyền truy cập riêng tư.
-2. Chọn **10 → 1**: tự lấy đúng keystore và 4 secrets từ bước 9, mã hóa archive bằng AES-256-CBC + PBKDF2 (300.000 vòng), rồi tải lên Google Drive. Không cần nhập lại từng secret.
-3. Chọn **10 → 2**: khôi phục archive. Việc khôi phục không tự ghi đè GitHub Secrets.
-
-Cấu hình remote Google Drive tên `gdrive` một lần bằng `rclone config` (cần cài `rclone`, `openssl`, `tar`). Mục 10 không còn lựa chọn cài đặt/cấu hình; nó kiểm tra remote rồi đồng bộ trực tiếp.
-
-### Thông báo tác vụ mục 10
-
-- Hiển thị trạng thái theo từng giai đoạn: kiểm tra kết nối, chuẩn bị dữ liệu, mã hóa, tải lên, tải xuống, giải mã và khôi phục.
-- Có thông báo riêng khi tác vụ thành công hoặc thất bại; lỗi có mã và vị trí dòng để dễ kiểm tra.
-- Nếu muốn nhận thông báo Android bên ngoài màn hình Termux, cài thêm **Termux:API** từ cùng nguồn với ứng dụng Termux và chạy `pkg install termux-api`. Nếu chưa cài, trạng thái vẫn hiển thị trong terminal.
-- Thông báo không chứa mật khẩu, Base64 hay nội dung secrets.
-
-
-**Bảo mật:** GitHub không cho đọc ngược Actions Secrets; mục 9 là nguồn dữ liệu chuẩn. Mật khẩu signing được lưu cục bộ dạng tệp riêng tư (quyền 600) để mục 10 dùng lại. Signing store password cũng được dùng để mã hóa archive. Bảo vệ thiết bị và thư mục `~/.apksign/credentials/`.
-
-
-## ⬆️ Cập nhật bằng lệnh
-
-Sau khi đã cài đặt, có thể cập nhật lên phiên bản mới nhất trực tiếp từ bất kỳ thư mục nào:
-
-```sh
-apksign --update
-```
-
-Lệnh này gọi installer của dự án, tải thay đổi mới nhất từ GitHub và cập nhật lệnh trong Termux PATH. Keystore tại `~/.apksign/` không bị xóa hoặc thay thế.
-
-Các lệnh khác:
-
-```sh
-apksign          # Mở menu
-apksign --help   # Xem trợ giúp
-```
+**khahdihdz** · [GitHub Repository](https://github.com/khahdihdz/apksign)
