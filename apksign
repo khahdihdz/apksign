@@ -187,8 +187,18 @@ sync_github_secrets() {
   fi
 
   rm -rf "$verify_dir"
+
+  # Lưu đúng bộ thông tin vừa xác minh để mục 10 dùng lại.
+  mkdir -p "$KEYSTORE_DIR/credentials"
+  chmod 700 "$KEYSTORE_DIR/credentials"
+  printf '%s' "$STORE_PASSWORD" > "$KEYSTORE_DIR/credentials/store-password"
+  printf '%s' "$KEY_PASSWORD" > "$KEYSTORE_DIR/credentials/key-password"
+  printf '%s' "$ALIAS" > "$KEYSTORE_DIR/credentials/key-alias"
+  chmod 600 "$KEYSTORE_DIR/credentials/"*
+
   unset STORE_PASSWORD KEY_PASSWORD
   echo -e "$GREEN Đã đồng bộ và xác minh đủ 4 Android signing secrets.$NC"
+  echo -e "$GREEN Đã lưu bộ signing đã xác minh để mục 10 dùng đúng dữ liệu này.$NC"
   echo "Keystore + Store Password + Alias + Key Password là cùng một bộ."
   echo "Bước tiếp theo: chạy workflow 'Sync Android signing to all repositories'."
   pause
@@ -207,7 +217,7 @@ while true; do
   echo "7. GitHub Secrets"
   echo "8. Sao lưu keystore"
   echo "9. Đồng bộ 4 GitHub Secrets"
-  echo "10. Sao lưu Keystore + GitHub Secrets lên Google Drive"
+  echo "10. Đồng bộ bộ signing đã xác minh lên Google Drive"
   echo
   echo "----------------------------------------------"
   echo "© 2026 khahdihdz"
