@@ -234,6 +234,65 @@ sync_github_secrets() {
 
 install_tools() { header; pkg update -y; pkg install openjdk-17 coreutils -y; java -version; pause; }
 
+install_missing() {
+  local label="$1"; shift
+  local missing=() package
+  for package in "$@"; do
+    if ! command -v "$package" >/dev/null 2>&1; then
+      missing+=("$package")
+    fi
+  done
+  if (("${#missing[@]}" == 0)); then
+    echo -e "$GREEN Đã có đủ: $label.$NC"
+    return 0
+  fi
+  echo -e "$YELLOW Thiếu gói cho $label: ${missing[*]}$NC"
+  read -r -p "Cài các gói còn thiếu ngay? [Y/n]: " answer
+  if [[ "${answer:-Y}" =~ ^[Yy]$ ]]; then
+    pkg install -y "${missing[@]}"
+  else
+    echo "Đã bỏ qua nhóm $label. Có thể chạy lại mục 11 sau."
+  fi
+}
+
+first_run_setup() {
+  local marker="$KEYSTORE_DIR/.first-run-complete"
+  [[ -f "$marker" ]] && return 0
+  header
+  echo "CHÀO MỪNG BẠN ĐẾN VỚI APKSIGN"
+  echo "Lần đầu sử dụng, công cụ sẽ kiểm tra các gói cần thiết."
+  echo "Không tạo hoặc thay đổi keystore nếu bạn chưa chọn chức năng tương ứng."
+  echo
+  if ! command -v pkg >/dev/null 2>&1; then
+    echo -e "$RED Không tìm thấy pkg. apksign chỉ hỗ trợ môi trường Termux.$NC"
+    pause
+    return 1
+  fi
+  install_missing "quản lý keystore" openjdk-17 coreutils
+  echo
+  install_missing "GitHub Secrets (mục 9)" gh
+  echo
+  install_missing "Google Drive Backup (mục 10)" rclone openssl tar
+  echo
+  if ! command -v termux-notification >/dev/null 2>&1; then
+    echo "Termux:API là tùy chọn để nhận thông báo Android."
+    echo "Cài ứng dụng Termux:API cùng nguồn với Termux, sau đó chạy: pkg install termux-api"
+  else
+    echo -e "$GREEN Termux:API đã sẵn sàng.$NC"
+  fi
+  mkdir -p "$KEYSTORE_DIR"
+  : > "$marker"
+  chmod 600 "$marker"
+  echo
+  echo "Thiết lập lần đầu đã hoàn tất."
+  echo "Bắt đầu an toàn: nếu đã có keystore từ trước, KHÔNG tạo keystore mới."
+  echo "Nếu chưa có, chọn mục 2 để tạo; chọn mục 9 để xác minh signing và GitHub Secrets."
+  echo "Chỉ dùng mục 10 sau khi mục 9 xác minh thành công và đã cấu hình rclone."
+  pause
+}
+
+first_run_setup
+
 while true; do
   header
   echo "1. Cài JDK / công cụ"
@@ -245,7 +304,8 @@ while true; do
   echo "7. GitHub Secrets"
   echo "8. Sao lưu keystore"
   echo "9. Đồng bộ 4 GitHub Secrets"
-  echo "10. Đồng bộ bộ signing đã xác minh lên Google Drive"
+  echo "10. Sao lưu / khôi phục bộ signing qua Google Drive"
+  echo "11. Kiểm tra / cài đặt gói cần thiết (thiết lập lần đầu)"
   echo
   echo "----------------------------------------------"
   echo "© 2026 khahdihdz"
@@ -264,6 +324,7 @@ while true; do
     8) backup_keystore ;;
     9) sync_github_secrets ;;
     10) "$HOME/apksign/drive-backup" ;;
+    11) install_tools; first_run_setup_force=1; install_missing "quản lý keystore" openjdk-17 coreutils; install_missing "GitHub Secrets" gh; install_missing "Google Drive Backup" rclone openssl tar; pause ;;
     0) clear; exit 0 ;;
     *) echo -e "$RED Lựa chọn không hợp lệ.$NC"; sleep 1 ;;
   esac
