@@ -13,6 +13,34 @@ CYAN='\033[0;36m'; NC='\033[0m'
 
 mkdir -p "$KEYSTORE_DIR"
 
+# CLI commands: apksign --update | --help
+case "${1:-}" in
+  --update|-u)
+    INSTALLER="$HOME/apksign/install.sh"
+    if [[ ! -f "$INSTALLER" ]]; then
+      echo "Không tìm thấy installer: $INSTALLER"
+      echo "Cài đặt lần đầu bằng:"
+      echo "curl -fsSL https://raw.githubusercontent.com/khahdihdz/apksign/main/install.sh | sh"
+      exit 1
+    fi
+    exec sh "$INSTALLER"
+    ;;
+  --help|-h)
+    echo "Cách dùng:"
+    echo "  apksign           Mở menu quản lý signing"
+    echo "  apksign --update  Tải và cài phiên bản mới nhất"
+    echo "  apksign --help    Hiển thị trợ giúp"
+    exit 0
+    ;;
+  "")
+    ;;
+  *)
+    echo "Tham số không hợp lệ: $1"
+    echo "Dùng 'apksign --help' để xem trợ giúp."
+    exit 2
+    ;;
+esac
+
 pause() { echo; read -r -p "Nhấn Enter để tiếp tục..."; }
 header() { clear; echo -e "$CYAN"; echo "=============================================="; echo "              apksign"; echo "   Android Signing Manager for Termux"; echo "=============================================="; echo -e "$NC"; }
 
