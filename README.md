@@ -47,6 +47,23 @@ apksign --update
 
 Installer tạo lệnh trong Termux PATH và giữ dữ liệu signing trong `~/.apksign/` khi cập nhật.
 
+## 🧭 Thiết lập lần đầu
+
+Ở lần mở `apksign` đầu tiên, chương trình tự chạy trình hướng dẫn:
+- Kiểm tra và hỏi trước khi cài OpenJDK 17 + Coreutils (quản lý keystore).
+- Hỏi cài GitHub CLI (`gh`) nếu muốn dùng mục 9.
+- Hỏi cài `rclone`, `openssl`, `tar` nếu muốn dùng mục 10.
+- Giới thiệu Termux:API (tùy chọn) để nhận thông báo Android.
+- Không tự tạo keystore, không tự đăng nhập GitHub/Google và không tự thay đổi secrets.
+
+Bạn có thể bỏ qua gói chưa cần dùng. Chạy lại **mục 11 – Kiểm tra/cài đặt gói cần thiết** bất cứ lúc nào để kiểm tra và cài bổ sung. Trình hướng dẫn lần đầu chỉ tự xuất hiện một lần; lựa chọn cài gói được hỏi trước khi thực hiện.
+
+**Thứ tự bắt đầu khuyến nghị:**
+1. Nếu đã có release keystore từ dự án trước, hãy giữ nguyên và không tạo key mới.
+2. Nếu chưa có keystore, chọn mục 2 để tạo.
+3. Chọn mục 9 để xác minh bộ signing và đồng bộ 4 GitHub Secrets.
+4. Cấu hình remote `gdrive`, sau đó dùng mục 10 để backup.
+
 ## 🧭 Menu chính
 
 ```text
