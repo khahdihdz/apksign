@@ -5,12 +5,28 @@ KEYSTORE="$ROOT/khahdihdz-release.jks"
 B64="$ROOT/keystore.base64"
 REMOTE="gdrive:apksign-backups"
 TMP=""
+TASK_NAME="Google Drive"
+notify(){
+  local level="${1:-info}" message="${2:-}"
+  printf '[%s] [%s] %s\\n' "$(date '+%H:%M:%S')" "$level" "$message"
+  if command -v termux-notification >/dev/null 2>&1; then
+    termux-notification --title "apksign • $TASK_NAME" --content "$message" --id 101 --priority high >/dev/null 2>&1 || true
+  fi
+}
 cleanup(){ [[ -n "${TMP:-}" && -d "$TMP" ]] && rm -rf "$TMP"; }
 trap cleanup EXIT
-pause(){ read -r -p "Nhấn Enter để tiếp tục..."; }
-need(){ command -v "$1" >/dev/null 2>&1 || { echo "Thiếu $1"; return 1; }; }
+pause(){
+  echo
+  echo "=============================================="
+  echo "KẾT QUẢ TÁC VỤ ĐÃ ĐƯỢC GIỮ TRÊN MÀN HÌNH"
+  echo "Nhấn Enter để quay lại menu apksign..."
+  read -r _ </dev/tty
+}
+need(){ command -v "$1" >/dev/null 2>&1 || { notify "THẤT BẠI" "Thiếu công cụ: $1"; return 1; }; }
 header(){ clear 2>/dev/null || true; echo "================================"; echo "       apksign Drive Backup"; echo "================================"; }
 backup(){
+  TASK_NAME="Sao lưu Google Drive"
+  notify "BẮT ĐẦU" "Bắt đầu sao lưu bộ signing."
   need rclone; need openssl; need tar
   [[ -s "$KEYSTORE" ]] || { echo "Không tìm thấy keystore: $KEYSTORE"; return 1; }
   local CRED="$ROOT/credentials"
@@ -18,9 +34,9 @@ backup(){
     echo "Chưa có bộ signing đã xác minh. Hãy chạy mục 9 trước."
     return 1
   }
+  notify "ĐANG XỬ LÝ" "Đang kiểm tra kết nối Google Drive."
   rclone lsd gdrive: >/dev/null || {
-    echo "Không truy cập được Google Drive remote gdrive."
-    echo "Cấu hình/đăng nhập một lần bằng: rclone config"
+    notify "THẤT BẠI" "Không truy cập được remote gdrive. Kiểm tra rclone config."
     return 1
   }
   mkdir -p "$ROOT"; chmod 700 "$ROOT"
@@ -36,27 +52,32 @@ backup(){
   } > "$TMP/github-secrets.env"
   chmod 600 "$TMP/"*
   ARCHIVE="$ROOT/apksign-backup-$(date '+%Y%m%d-%H%M%S').tar.gz.enc"
-  echo "Đang mã hóa đúng keystore + 4 secrets đã xác minh ở mục 9..."
+  notify "ĐANG XỬ LÝ" "Đang mã hóa keystore và 4 secrets."
   tar -czf - -C "$TMP" . | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 300000 -md sha256 -pass "file:$CRED/store-password" -out "$ARCHIVE"
   chmod 600 "$ARCHIVE"
-  echo "Đang đồng bộ bản backup đã mã hóa lên Google Drive..."
+  notify "ĐANG XỬ LÝ" "Mã hóa xong. Đang tải bản backup lên Google Drive."
   rclone mkdir "$REMOTE"
   rclone copyto "$ARCHIVE" "$REMOTE/$(basename "$ARCHIVE")" --progress
   echo "Đồng bộ hoàn tất: $REMOTE/$(basename "$ARCHIVE")"
   echo "Đã sao lưu keystore, Base64 và chính xác 4 secrets từ mục 9."
   echo "Mật khẩu mã hóa archive là signing store password."
+  notify "THÀNH CÔNG" "Backup hoàn tất: $(basename "$ARCHIVE")"
 }
 restore(){
+  TASK_NAME="Khôi phục Google Drive"
+  notify "BẮT ĐẦU" "Bắt đầu khôi phục bản backup."
   need rclone; need openssl; need tar
   echo "Các bản backup trên Drive:"
   rclone lsf "$REMOTE" --files-only | grep '\.tar\.gz\.enc$' || { echo "Không có bản backup."; return 1; }
   read -r -p "Tên file backup cần khôi phục: " NAME
   [[ "$NAME" =~ ^apksign-backup-[0-9-]+\.tar\.gz\.enc$ ]] || { echo "Tên file không hợp lệ."; return 1; }
   TMP="$(mktemp -d "$ROOT/restore.XXXXXX")"; chmod 700 "$TMP"
+  notify "ĐANG XỬ LÝ" "Đang tải bản backup: $NAME"
   rclone copyto "$REMOTE/$NAME" "$TMP/backup.enc"
-  read -r -s -p "Signing store password để giải mã: " PASS; echo
+  read -r -s -p "Signing store password để giải mã: " PASS </dev/tty; echo
+  notify "ĐANG XỬ LÝ" "Đang giải mã và kiểm tra archive."
   if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 300000 -md sha256 -pass "pass:$PASS" -in "$TMP/backup.enc" | tar -xz -C "$TMP"; then
-    unset PASS; echo "Giải mã thất bại. Kiểm tra signing store password hoặc file."; return 1
+    unset PASS; notify "THẤT BẠI" "Giải mã thất bại. Kiểm tra mật khẩu hoặc file backup."; return 1
   fi
   unset PASS
   [[ -s "$TMP/khahdihdz-release.jks" ]] || { echo "Backup không có keystore hợp lệ."; return 1; }
@@ -68,6 +89,7 @@ restore(){
   echo "Đã khôi phục keystore và Base64 vào $ROOT"
   echo "Secrets nằm trong github-secrets.env của bản giải nén tạm; xem nội dung chỉ khi cần."
   echo "Không tự động ghi secrets lên GitHub để tránh ghi đè nhầm."
+  notify "THÀNH CÔNG" "Khôi phục keystore và Base64 hoàn tất."
 }
 header
 echo "Đồng bộ một chiều: mục 9 → mục 10"
@@ -76,11 +98,18 @@ echo
 echo "1. Đồng bộ bộ signing hiện tại lên Google Drive"
 echo "2. Khôi phục bản backup từ Google Drive"
 echo "0. Thoát"
-read -r -p "Chọn: " choice
+read -r -p "Chọn: " choice </dev/tty
+RESULT=0
 case "$choice" in
-  1) backup ;;
-  2) restore ;;
+  1) backup || RESULT=$? ;;
+  2) restore || RESULT=$? ;;
   0) exit 0 ;;
-  *) echo "Lựa chọn không hợp lệ." ;;
+  *) echo "Lựa chọn không hợp lệ."; RESULT=2 ;;
 esac
+if [[ "$RESULT" -ne 0 ]]; then
+  notify "THẤT BẠI" "Tác vụ kết thúc với mã lỗi $RESULT. Xem nội dung phía trên."
+else
+  echo
+  echo "Tác vụ đã kết thúc thành công."
+fi
 pause
