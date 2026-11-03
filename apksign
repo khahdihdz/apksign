@@ -42,7 +42,7 @@ case "${1:-}" in
 esac
 
 pause() { echo; read -r -p "Nhấn Enter để tiếp tục..."; }
-header() { clear; echo -e "$CYAN"; echo "=============================================="; echo "              apksign"; echo "   Android Signing Manager for Termux"; echo "=============================================="; echo -e "$NC"; echo -e "${YELLOW}       Developed with care by khahdihdz${NC}"; echo "       github.com/khahdihdz/apksign"; echo; }
+header() { clear; echo -e "$CYAN"; echo "=============================================="; echo "                 apksign"; echo "      Android Signing Manager for Termux"; echo "=============================================="; echo -e "$NC"; echo -e "${YELLOW}          Developed by khahdihdz${NC}"; echo -e "${CYAN}       Open Source  |  MIT License${NC}"; echo "       github.com/khahdihdz/apksign"; echo; }
 
 check_java() {
   command -v keytool >/dev/null 2>&1 && return 0
