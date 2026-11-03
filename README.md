@@ -219,13 +219,12 @@ Website: https://khahdihdz.github.io/
 
 ## ☁️ Sao lưu Google Drive
 
-Menu **10. Sao lưu Keystore + GitHub Secrets lên Google Drive** hỗ trợ:
+Menu **9 → 10** là luồng đồng bộ một chiều:
 
-- Cấu hình Google Drive bằng [rclone](https://rclone.org/drive/) và OAuth.
-- Sao lưu keystore JKS, Base64 và 4 Android signing secrets vào một archive.
-- Mã hóa archive cục bộ bằng AES-256-CBC + PBKDF2 (300.000 vòng) trước khi tải lên Drive.
-- Khôi phục keystore từ bản backup đã mã hóa; secrets được khôi phục cục bộ tại `~/.apksign/backup-secrets.env`.
+1. Chọn **9**: xác minh keystore và mật khẩu, cập nhật 4 GitHub Secrets. Khi thành công, công cụ lưu chính bộ signing vừa xác minh trong `~/.apksign/credentials/` với quyền truy cập riêng tư.
+2. Chọn **10 → 1**: tự lấy đúng keystore và 4 secrets từ bước 9, mã hóa archive bằng AES-256-CBC + PBKDF2 (300.000 vòng), rồi tải lên Google Drive. Không cần nhập lại từng secret.
+3. Chọn **10 → 2**: khôi phục archive. Việc khôi phục không tự ghi đè GitHub Secrets.
 
-Lần đầu chọn menu 10 → 1 để cài rclone và cấu hình remote tên `gdrive`; sau đó chọn 10 → 2 để sao lưu. Chọn 10 → 3 để khôi phục.
+Cấu hình remote Google Drive tên `gdrive` một lần bằng `rclone config` (cần cài `rclone`, `openssl`, `tar`). Mục 10 không còn lựa chọn cài đặt/cấu hình; nó kiểm tra remote rồi đồng bộ trực tiếp.
 
-**Bảo mật:** GitHub không cho đọc lại giá trị Actions Secrets đã lưu. Khi sao lưu, hãy nhập lại đúng mật khẩu hiện tại. Không tải archive chưa mã hóa lên Drive, không chia sẻ mật khẩu backup, và giữ thêm một bản sao ngoại tuyến. Khôi phục không tự động ghi đè GitHub Secrets.
+**Bảo mật:** GitHub không cho đọc ngược Actions Secrets; mục 9 là nguồn dữ liệu chuẩn. Mật khẩu signing được lưu cục bộ dạng tệp riêng tư (quyền 600) để mục 10 dùng lại. Signing store password cũng được dùng để mã hóa archive. Bảo vệ thiết bị và thư mục `~/.apksign/credentials/`.
